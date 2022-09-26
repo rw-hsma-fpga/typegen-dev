@@ -16,18 +16,7 @@
 #include FT_FREETYPE_H
 
 
-#define WIDTH   1280
-#define HEIGHT  1000
-
-
-/* origin is the upper left corner */
-unsigned char image[HEIGHT][WIDTH];
-
-
-void draw_to_textfile( FT_Bitmap*  bitmap,FT_Int x, FT_Int y, char* filename);
-void draw_bitmap( FT_Bitmap*  bitmap,FT_Int x, FT_Int y);
-void show_image( void );
-
+void draw_to_textfile(FT_Bitmap* bitmap, FT_Int x, FT_Int y, char* filename);
 
 
 
@@ -35,6 +24,8 @@ static struct argp_option options[] = {
   { "metrics",    'm', 0,         0, "output glyph metrics on stdout"},
 
   { "font",       'f', "FFILE",   0, "font input file"},
+  // d - dpi
+  // p - points
   { "character",  'c', "CHAR",    0, "input character (string format)"},
 
   { "textout",    't', "TBOUT",   0, "text bitmap output file path"},
@@ -75,45 +66,28 @@ int main( int argc, char**  argv )
   FT_GlyphSlot  slot;
   FT_Error      error;
 
-  char*         filename;
-  char*         text;
-
-  int           target_height;
 
   struct arguments *arguments = calloc(1, sizeof(struct arguments));
 
   argp_parse (&argp, argc, argv, 0, 0, arguments);
-/*
-  if ( argc != 3 ) {
-    fprintf ( stderr, "usage: %s font sample-text\n", argv[0] );
-    exit( 1 );
-  }
 
-  filename      = argv[1];                    
-  text          = argv[2];                     
-*/
 
-  filename = arguments->font_file;
-  text = arguments->character;
-
-  if ( filename==NULL || strlen(filename) == 0 )
+  if ( arguments->font_file==NULL || strlen(arguments->font_file) == 0 )
   {
     fprintf ( stderr, "No font file specified.\r\n");
     exit( 1 );
   }
 
-  if ( text==NULL || strlen(text) == 0 )
+  if ( arguments->character==NULL || strlen(arguments->character) == 0 )
   {
     fprintf ( stderr, "No character specified.\r\n");
     exit( 1 );
   }
 
-  target_height = HEIGHT;
-
   error = FT_Init_FreeType( &library );              /* initialize library */
   /* error handling omitted */
 
-  error = FT_New_Face( library, filename, 0, &face );/* create face object */
+  error = FT_New_Face( library, arguments->font_file, 0, &face );/* create face object */
   /* error handling omitted */
 
   /* use 72pt at 891dpi */
@@ -126,22 +100,69 @@ int main( int argc, char**  argv )
   slot = face->glyph;
 
   /* load glyph image into the slot (erase previous one) */
-  error = FT_Load_Char( face, text[0], FT_LOAD_RENDER );
+  error = FT_Load_Char( face, arguments->character[0], FT_LOAD_RENDER );
 
-  draw_to_textfile( &slot->bitmap, slot->bitmap_left, target_height - slot->bitmap_top, arguments->text_file);
+  if (arguments->metrics) { //metrics
+    printf("=== METRICS START ===\r\n");
+    printf("face->units_per_EM  (design global [?]): %d\r\n",face->units_per_EM);
+    //printf("face->bbox (design global [?]): %d\r\n",face->bbox);
 
-  /* now, draw to our target surface (convert position)
-  draw_bitmap( &slot->bitmap,
-                slot->bitmap_left,
-                target_height - slot->bitmap_top );
+    printf("face->ascender  (design global [?]): %d\r\n",face->ascender);
+    printf("face->descender (design global [?]): %d\r\n",face->descender);
+    long int asc = face->size->metrics.ascender;
+    printf("face->size->metrics.ascender   (scaled global [?]): %d.%d\r\n",(int)(asc>>6),(int)(asc&0x3F));
+    long int desc = face->size->metrics.descender;
+    printf("face->size->metrics.descender  (scaled global [?]): %d.%d\r\n",(int)(desc>>6),(int)(desc&0x3F));
 
-  show_image();
- */
+    printf("slot->advance.x (Advance [px?]): %d\r\n",(int)(slot->advance.x)>>6);
+    printf("slot->bitmap_left (Left bearing [px]): %d\r\n",slot->bitmap_left);
+    printf("slot->bitmap_top  (Top bearing from baseline [px]): %d\r\n",slot->bitmap_top);
+    printf("slot->bitmap.width (Char width [px]) : %d\r\n",slot->bitmap.width);
+    printf("slot->bitmap.rows  (Char height [px]): %d\r\n",slot->bitmap.rows);
+
+
+    printf("==== METRICS END ====\r\n");
+  }
+
+  draw_to_textfile( &slot->bitmap, slot->bitmap.width, slot->bitmap.rows, arguments->text_file);
+//  draw_to_textfile( &slot->bitmap, slot->bitmap_left, target_height - slot->bitmap_top, arguments->text_file);
 
   FT_Done_Face    ( face );
   FT_Done_FreeType( library );
 
   return 0;
+}
+
+void draw_to_textfile( FT_Bitmap*  bitmap,FT_Int width, FT_Int height, char* filename)
+{
+  FT_Int  x, y;
+
+
+  if (!filename) {
+    fprintf(stderr, "No textfile specified.\r\n");
+    return;
+  }
+
+  FILE *fp = fopen(filename, "w");
+  if (!fp) {
+    fprintf(stderr, "Failed to open text bitmap file %s for writing.\r\n", filename);
+    return;
+  }
+
+  /* for simplicity, we assume that `bitmap->pixel_mode' */
+  /* is `FT_PIXEL_MODE_GRAY' (i.e., not a bitmap font)   */
+
+  for ( y = 0; y < height; y++ ) {
+    for ( x = 0; x < width; x++ ) {
+      char pix = bitmap->buffer[y * width + x];
+      char c = (pix == 0) ? '.' : ((pix < 32) ? '+' : 'X') ;
+      fputc(c, fp);
+    }
+    fputc('\n', fp);
+  }
+
+  fclose(fp);
+  fprintf(stdout, "Wrote text bitmap to %s\r\n", filename);
 }
 
 
@@ -196,89 +217,3 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state)
   return 0;
 }
 
-
-
-void draw_to_textfile( FT_Bitmap*  bitmap,FT_Int x, FT_Int y, char* filename)
-{
-  FT_Int  i, j, p, q;
-  FT_Int  x_max = x + bitmap->width;
-  FT_Int  y_max = y + bitmap->rows;
-
-  if (!filename) {
-    fprintf(stderr, "No textfile specified.\r\n");
-    return;
-  }
-
-  FILE *fp = fopen(filename, "w");
-  if (!fp) {
-    fprintf(stderr, "Failed to open text bitmap file %s for writing.\r\n", filename);
-    return;
-  }
-
-  /* for simplicity, we assume that `bitmap->pixel_mode' */
-  /* is `FT_PIXEL_MODE_GRAY' (i.e., not a bitmap font)   */
-
-  for ( i = x, p = 0; i < x_max; i++, p++ )
-  {
-    for ( j = y, q = 0; j < y_max; j++, q++ )
-    {
-      if ( i < 0      || j < 0       ||
-           i >= WIDTH || j >= HEIGHT )
-        continue;
-
-      image[j][i] |= bitmap->buffer[q * bitmap->width + p];
-    }
-  }
-
-  for ( i = 0; i < HEIGHT; i++ ) {
-    for ( j = 0; j < WIDTH; j++ ) {
-
-      char c = (image[i][j] == 0) ? ' ' : ((image[i][j] < 128) ? '+' : '*') ;
-      fputc(c, fp);
-    }
-    fputc('\n', fp);
-  }
-
-  fclose(fp);
-  fprintf(stdout, "Wrote text bitmap to %s\r\n", filename);
-
-}
-
-void draw_bitmap( FT_Bitmap*  bitmap,FT_Int x, FT_Int y)
-{
-  FT_Int  i, j, p, q;
-  FT_Int  x_max = x + bitmap->width;
-  FT_Int  y_max = y + bitmap->rows;
-
-
-  /* for simplicity, we assume that `bitmap->pixel_mode' */
-  /* is `FT_PIXEL_MODE_GRAY' (i.e., not a bitmap font)   */
-
-  for ( i = x, p = 0; i < x_max; i++, p++ )
-  {
-    for ( j = y, q = 0; j < y_max; j++, q++ )
-    {
-      if ( i < 0      || j < 0       ||
-           i >= WIDTH || j >= HEIGHT )
-        continue;
-
-      image[j][i] |= bitmap->buffer[q * bitmap->width + p];
-    }
-  }
-}
-
-
-void show_image( void )
-{
-  int  i, j;
-
-
-  for ( i = 0; i < HEIGHT; i++ )
-  {
-    for ( j = 0; j < WIDTH; j++ )
-      putchar( image[i][j] == 0 ? ' '
-                                : image[i][j] < 128 ? '+'
-                                                    : '*' );
-    putchar( '\n' );
-  }
-}
