@@ -16,7 +16,11 @@
 #include FT_FREETYPE_H
 
 
-void draw_to_textfile(FT_Bitmap* bitmap, FT_Int x, FT_Int y, char* filename);
+void draw_to_textfile(  FT_Bitmap*  bitmap,
+                        FT_Int type_width, FT_Int type_height,
+                        FT_Int char_left, FT_Int char_top,
+                        FT_Int char_width, FT_Int char_height,
+                        char* filename);
 
 const double INCH_PER_PT = 0.013835; // per table; 72pt are 0.99612 inch
 // const double INCH_PER_PT = 0.013888; // as 1/72th of an inch
@@ -163,7 +167,11 @@ int main( int argc, char**  argv )
     printf("==== METRICS END ====\r\n");
   }
 
-  draw_to_textfile( &slot->bitmap, slot->bitmap.width, slot->bitmap.rows, arguments->text_file);
+  draw_to_textfile( &slot->bitmap,
+                    set_width_px, body_size_px,
+                    char_left_start, char_top_start,
+                    char_width_px, char_height_px,
+                    arguments->text_file);
 //  draw_to_textfile( &slot->bitmap, slot->bitmap_left, target_height - slot->bitmap_top, arguments->text_file);
 
   FT_Done_Face    ( face );
@@ -172,9 +180,15 @@ int main( int argc, char**  argv )
   return 0;
 }
 
-void draw_to_textfile( FT_Bitmap*  bitmap,FT_Int width, FT_Int height, char* filename)
+void draw_to_textfile(  FT_Bitmap*  bitmap,
+                        FT_Int type_width, FT_Int type_height,
+                        FT_Int char_left, FT_Int char_top,
+                        FT_Int char_width, FT_Int char_height,
+                        char* filename)
 {
-  FT_Int  x, y;
+  FT_Int  x, y, x2, y2;
+  unsigned char pix;
+  char c;
 
 
   if (!filename) {
@@ -191,20 +205,27 @@ void draw_to_textfile( FT_Bitmap*  bitmap,FT_Int width, FT_Int height, char* fil
   /* for simplicity, we assume that `bitmap->pixel_mode' */
   /* is `FT_PIXEL_MODE_GRAY' (i.e., not a bitmap font)   */
 
-  for ( y = 0; y < height; y++ ) {
-    for ( x = 0; x < width; x++ ) {
-      unsigned char pix = bitmap->buffer[y * width + x];
-      
-      //char c = (pix == 0) ? '.' : ((pix < 32) ? '+' : 'X') ;
-      char c = '.';
-      if (pix) {
-        c = '0'; 
-        while(pix) {
-          c++;
-          pix >>= 1;
-        }
+  for ( y = 0; y < type_height; y++ ) {
+    for ( x = 0; x < type_width; x++ ) {
+      c = '.';
+
+      if ( (x>=char_left) && (x<char_left+char_width)
+            && (y>=char_top) && (y<char_top+char_height)) {
+          x2 = x - char_left;
+          y2 = y - char_top;
+          pix = bitmap->buffer[y2 * char_width + x2];
+          
+          //c = (pix == 0) ? '.' : ((pix < 32) ? '+' : 'X') ;
+          if (pix) {
+            c = '0'; 
+            while(pix) {
+              c++;
+              pix >>= 1;
+            }
+          }
       }
-      fputc(c, fp);
+
+      fputc(c, fp);fputc(c, fp);fputc(c, fp);fputc(c, fp); // TODO remove 3; just for visual scaling in Kate
     }
     fputc('\n', fp);
   }
