@@ -18,6 +18,11 @@
 
 void draw_to_textfile(FT_Bitmap* bitmap, FT_Int x, FT_Int y, char* filename);
 
+const double INCH_PER_PT = 0.013835; // per table; 72pt are 0.99612 inch
+// const double INCH_PER_PT = 0.013888; // as 1/72th of an inch
+
+const int dpi = 891; // make commandline parameter
+const int ptsize = 72; // make commandline parameter
 
 
 static struct argp_option options[] = {
@@ -102,23 +107,57 @@ int main( int argc, char**  argv )
   /* load glyph image into the slot (erase previous one) */
   error = FT_Load_Char( face, arguments->character[0], FT_LOAD_RENDER );
 
+  // metrics
+  int ascender_scaled = (int)(face->size->metrics.ascender>>6);
+  int descender_scaled = (int)(face->size->metrics.descender>>6);
+  int ascdesc_size_scaled = (int)((face->size->metrics.ascender)>>6) + 1 - (int)((face->size->metrics.descender)>>6);
+
+
+  double PX_PER_INCH = dpi;
+  double INCH_PER_PX = 1/PX_PER_INCH;
+
+  int char_width_px = slot->bitmap.width;
+  int char_height_px = slot->bitmap.rows;
+  int advanceX_px = (int)(slot->advance.x)>>6;
+  int set_width_px = advanceX_px;
+
+  int body_size_scaled = ascdesc_size_scaled;
+  double body_size_inch = ptsize * INCH_PER_PT; //(body size of lead type)
+  double body_size_px = body_size_inch * PX_PER_INCH;
+  double PX_PER_SCALED = body_size_px / body_size_scaled;
+  double ascender_px = ascender_scaled * PX_PER_SCALED;
+  double descender_px = descender_scaled * PX_PER_SCALED;
+
+  int char_left_start = slot->bitmap_left;
+  int char_top_start = round(ascender_px - slot->bitmap_top);
+
+
+
   if (arguments->metrics) { //metrics
     printf("=== METRICS START ===\r\n");
     printf("face->units_per_EM  (design global [?]): %d\r\n",face->units_per_EM);
-    //printf("face->bbox (design global [?]): %d\r\n",face->bbox);
+      //printf("face->bbox (design global [?]): %d\r\n",face->bbox);
+      //printf("face->ascender  (design global [?]): %d\r\n",face->ascender);
+      //printf("face->descender (design global [?]): %d\r\n",face->descender);
+    printf("face->size->metrics.ascender   (global [scaled]): %d\r\n",ascender_scaled);
+    printf("face->size->metrics.descender  (global [scaled]): %d\r\n",descender_scaled);
+    printf("[Computed]  (Maximum type extent [scaled]): %d\r\n",ascdesc_size_scaled);
 
-    printf("face->ascender  (design global [?]): %d\r\n",face->ascender);
-    printf("face->descender (design global [?]): %d\r\n",face->descender);
-    long int asc = face->size->metrics.ascender;
-    printf("face->size->metrics.ascender   (scaled global [?]): %d.%d\r\n",(int)(asc>>6),(int)(asc&0x3F));
-    long int desc = face->size->metrics.descender;
-    printf("face->size->metrics.descender  (scaled global [?]): %d.%d\r\n",(int)(desc>>6),(int)(desc&0x3F));
-
-    printf("slot->advance.x (Advance [px?]): %d\r\n",(int)(slot->advance.x)>>6);
+    printf("slot->advance.x (Advance [px]): %d\r\n",(int)(slot->advance.x)>>6);
     printf("slot->bitmap_left (Left bearing [px]): %d\r\n",slot->bitmap_left);
     printf("slot->bitmap_top  (Top bearing from baseline [px]): %d\r\n",slot->bitmap_top);
+
+    printf("[Computed]  (Body size [scaled]): %d\r\n",body_size_scaled);
+    printf("[Computed]  (Body size [in]): %f\r\n",body_size_inch);
+    printf("----------------------\r\n");
     printf("slot->bitmap.width (Char width [px]) : %d\r\n",slot->bitmap.width);
     printf("slot->bitmap.rows  (Char height [px]): %d\r\n",slot->bitmap.rows);
+    printf("[Computed]  (Body size [px]): %f\r\n",body_size_px);
+    printf("[Computed]  (Set width [px]): %d\r\n",set_width_px);
+    printf("[Computed]  (Ascender [px]): %f\r\n",ascender_px);
+    printf("[Computed]  (Descender [px]): %f\r\n",descender_px);
+    printf("[Computed]  (Char left start [px]): %d\r\n",char_left_start);
+    printf("[Computed]  (Char top start [px]): %d\r\n",char_top_start);
 
 
     printf("==== METRICS END ====\r\n");
@@ -154,8 +193,17 @@ void draw_to_textfile( FT_Bitmap*  bitmap,FT_Int width, FT_Int height, char* fil
 
   for ( y = 0; y < height; y++ ) {
     for ( x = 0; x < width; x++ ) {
-      char pix = bitmap->buffer[y * width + x];
-      char c = (pix == 0) ? '.' : ((pix < 32) ? '+' : 'X') ;
+      unsigned char pix = bitmap->buffer[y * width + x];
+      
+      //char c = (pix == 0) ? '.' : ((pix < 32) ? '+' : 'X') ;
+      char c = '.';
+      if (pix) {
+        c = '0'; 
+        while(pix) {
+          c++;
+          pix >>= 1;
+        }
+      }
       fputc(c, fp);
     }
     fputc('\n', fp);
