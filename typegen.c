@@ -33,18 +33,18 @@ void make_type_bitmap(  FT_Bitmap *input_bitmap,
 void bitmap_to_textfile(struct type_bitmap_8bit *output_bitmap,
                         char* filename);
 
-
-
-void draw_to_textfile(  FT_Bitmap*  bitmap,
-                        FT_Int type_width, FT_Int type_height,
-                        FT_Int char_left, FT_Int char_top,
-                        FT_Int char_width, FT_Int char_height,
+void bitmap_to_rawbitmap(struct type_bitmap_8bit *bitmap,
                         char* filename);
+
+
+
+const int BW_THRESHOLD = 32;
+
 
 const double INCH_PER_PT = 0.013835; // per table; 72pt are 0.99612 inch
 // const double INCH_PER_PT = 0.013888; // as 1/72th of an inch
 
-const int dpi = 2*891; // make commandline parameter
+const int dpi = 891; // make commandline parameter
 const int ptsize = 72; // make commandline parameter
 
 
@@ -191,13 +191,6 @@ int main( int argc, char**  argv )
     printf("==== METRICS END ====\r\n");
   }
 
-  /*
-  draw_to_textfile( &slot->bitmap,
-                    set_width_px, body_size_px,
-                    char_left_start, char_top_start,
-                    char_width_px, char_height_px,
-                    arguments->text_file);
-*/
 
   struct type_bitmap_8bit type_bm;
 
@@ -210,6 +203,8 @@ int main( int argc, char**  argv )
   bitmap_to_textfile(&type_bm,
                      arguments->text_file);
 
+  bitmap_to_rawbitmap(&type_bm,
+                     arguments->bitmap_file);
 
   FT_Done_Face    ( face );
   FT_Done_FreeType( library );
@@ -237,21 +232,23 @@ void make_type_bitmap(  FT_Bitmap *input_bitmap,
 
   for ( y = 0; y < type_height; y++ ) {
     for ( x = 0; x < type_width; x++ ) {
-      *outbuf = '.';
+      *outbuf = 0x00;
 
       if ( (x>=char_left) && (x<char_left+char_width)
             && (y>=char_top) && (y<char_top+char_height)) {
           x2 = x - char_left;
           y2 = y - char_top;
           pix = input_bitmap->buffer[y2 * char_width + x2];
-          
+          if (pix>=BW_THRESHOLD)
+            *outbuf = 0xFF;
+          /*
           if (pix) {
             *outbuf = 0x30;
             while(pix) {
               *outbuf = *outbuf + 1;
               pix >>= 1;
             }
-          }
+          }*/
       }
       outbuf++;
     }
@@ -276,15 +273,11 @@ void bitmap_to_textfile(struct type_bitmap_8bit *bitmap,
     fprintf(stderr, "Failed to open text bitmap file %s for writing.\r\n", filename);
     return;
   }
-
-  /* for simplicity, we assume that `bitmap->pixel_mode' */
-  /* is `FT_PIXEL_MODE_GRAY' (i.e., not a bitmap font)   */
-
   unsigned char *buf = bitmap->buffer;
 
   for ( y = 0; y < bitmap->height; y++ ) {
     for ( x = 0; x < bitmap->width; x++ ) {
-      char c = *buf++;
+      char c = (*buf++) ? 'X' : '.';
 
       fputc(c, fp);fputc(c, fp);fputc(c, fp);fputc(c, fp); // TODO remove 3; just for visual scaling in Kate
     }
@@ -296,10 +289,8 @@ void bitmap_to_textfile(struct type_bitmap_8bit *bitmap,
 }
 
 
-void draw_to_textfile(  FT_Bitmap*  bitmap,
-                        FT_Int type_width, FT_Int type_height,
-                        FT_Int char_left, FT_Int char_top,
-                        FT_Int char_width, FT_Int char_height,
+
+void bitmap_to_rawbitmap(struct type_bitmap_8bit *bitmap,
                         char* filename)
 {
   FT_Int  x, y, x2, y2;
@@ -308,46 +299,32 @@ void draw_to_textfile(  FT_Bitmap*  bitmap,
 
 
   if (!filename) {
-    fprintf(stderr, "No textfile specified.\r\n");
+    fprintf(stderr, "No raw bitmap file specified.\r\n");
     return;
   }
 
   FILE *fp = fopen(filename, "w");
   if (!fp) {
-    fprintf(stderr, "Failed to open text bitmap file %s for writing.\r\n", filename);
+    fprintf(stderr, "Failed to open raw bitmap file %s for writing.\r\n", filename);
     return;
   }
+  
+  fprintf(fp, "P1\r\n%d %d\r\n",bitmap->width,bitmap->height);
 
-  /* for simplicity, we assume that `bitmap->pixel_mode' */
-  /* is `FT_PIXEL_MODE_GRAY' (i.e., not a bitmap font)   */
 
-  for ( y = 0; y < type_height; y++ ) {
-    for ( x = 0; x < type_width; x++ ) {
-      c = '.';
 
-      if ( (x>=char_left) && (x<char_left+char_width)
-            && (y>=char_top) && (y<char_top+char_height)) {
-          x2 = x - char_left;
-          y2 = y - char_top;
-          pix = bitmap->buffer[y2 * char_width + x2];
-          
-          //c = (pix == 0) ? '.' : ((pix < 32) ? '+' : 'X') ;
-          if (pix) {
-            c = '0'; 
-            while(pix) {
-              c++;
-              pix >>= 1;
-            }
-          }
-      }
+  unsigned char *buf = bitmap->buffer;
 
-      fputc(c, fp);fputc(c, fp);fputc(c, fp);fputc(c, fp); // TODO remove 3; just for visual scaling in Kate
+  for ( y = 0; y < bitmap->height; y++ ) {
+    for ( x = 0; x < bitmap->width; x++ ) {
+      char c = (*buf++) ? '1' : '0';
+      fputc(c, fp); fputc(' ', fp);
     }
-    fputc('\n', fp);
+    fputc('\r', fp);fputc('\n', fp);
   }
 
   fclose(fp);
-  fprintf(stdout, "Wrote text bitmap to %s\r\n", filename);
+  fprintf(stdout, "Wrote raw PBM bitmap to %s\r\n", filename);
 }
 
 
