@@ -15,6 +15,25 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
+struct type_bitmap_8bit {
+  int width;
+  int height;
+  char *buffer;
+};
+
+void make_type_bitmap(  FT_Bitmap *input_bitmap,
+                        FT_Int type_width, FT_Int type_height,
+                        FT_Int char_left, FT_Int char_top,
+                        FT_Int char_width, FT_Int char_height,
+                        struct type_bitmap_8bit *output_bitmap
+                        );
+
+
+
+void bitmap_to_textfile(struct type_bitmap_8bit *output_bitmap,
+                        char* filename);
+
+
 
 void draw_to_textfile(  FT_Bitmap*  bitmap,
                         FT_Int type_width, FT_Int type_height,
@@ -25,7 +44,7 @@ void draw_to_textfile(  FT_Bitmap*  bitmap,
 const double INCH_PER_PT = 0.013835; // per table; 72pt are 0.99612 inch
 // const double INCH_PER_PT = 0.013888; // as 1/72th of an inch
 
-const int dpi = 891; // make commandline parameter
+const int dpi = 2*891; // make commandline parameter
 const int ptsize = 72; // make commandline parameter
 
 
@@ -100,7 +119,7 @@ int main( int argc, char**  argv )
   /* error handling omitted */
 
   /* use 72pt at 891dpi */
-  error = FT_Set_Char_Size( face, 72 << 6, 0, 891, 0 );/* set char size */
+  error = FT_Set_Char_Size( face, ptsize << 6, 0, dpi, 0 );/* set char size */
   /* error handling omitted */
 
   /* cmap selection omitted;                                        */
@@ -153,6 +172,11 @@ int main( int argc, char**  argv )
 
     printf("[Computed]  (Body size [scaled]): %d\r\n",body_size_scaled);
     printf("[Computed]  (Body size [in]): %f\r\n",body_size_inch);
+
+    printf("[Computed]  (Char width [in]): %f\r\n",(double)char_width_px / PX_PER_INCH);
+    printf("[Computed]  (Char height [in]): %f\r\n",(double)char_height_px / PX_PER_INCH);
+
+
     printf("----------------------\r\n");
     printf("slot->bitmap.width (Char width [px]) : %d\r\n",slot->bitmap.width);
     printf("slot->bitmap.rows  (Char height [px]): %d\r\n",slot->bitmap.rows);
@@ -167,18 +191,110 @@ int main( int argc, char**  argv )
     printf("==== METRICS END ====\r\n");
   }
 
+  /*
   draw_to_textfile( &slot->bitmap,
                     set_width_px, body_size_px,
                     char_left_start, char_top_start,
                     char_width_px, char_height_px,
                     arguments->text_file);
-//  draw_to_textfile( &slot->bitmap, slot->bitmap_left, target_height - slot->bitmap_top, arguments->text_file);
+*/
+
+  struct type_bitmap_8bit type_bm;
+
+  make_type_bitmap( &slot->bitmap,
+                    set_width_px, body_size_px,
+                    char_left_start, char_top_start,
+                    char_width_px, char_height_px,
+                    &type_bm);
+
+  bitmap_to_textfile(&type_bm,
+                     arguments->text_file);
+
 
   FT_Done_Face    ( face );
   FT_Done_FreeType( library );
 
   return 0;
 }
+
+
+void make_type_bitmap(  FT_Bitmap *input_bitmap,
+                        FT_Int type_width, FT_Int type_height,
+                        FT_Int char_left, FT_Int char_top,
+                        FT_Int char_width, FT_Int char_height,
+                        struct type_bitmap_8bit *output_bitmap
+                        )
+{
+  FT_Int  x, y, x2, y2;
+  unsigned char pix;
+  char c;
+
+  output_bitmap->buffer = calloc((size_t)(type_width*type_height), sizeof(unsigned char));
+  output_bitmap->width = type_width;
+  output_bitmap->height = type_height;
+  
+  unsigned char* outbuf = output_bitmap->buffer;
+
+  for ( y = 0; y < type_height; y++ ) {
+    for ( x = 0; x < type_width; x++ ) {
+      *outbuf = '.';
+
+      if ( (x>=char_left) && (x<char_left+char_width)
+            && (y>=char_top) && (y<char_top+char_height)) {
+          x2 = x - char_left;
+          y2 = y - char_top;
+          pix = input_bitmap->buffer[y2 * char_width + x2];
+          
+          if (pix) {
+            *outbuf = 0x30;
+            while(pix) {
+              *outbuf = *outbuf + 1;
+              pix >>= 1;
+            }
+          }
+      }
+      outbuf++;
+    }
+  }
+}
+
+void bitmap_to_textfile(struct type_bitmap_8bit *bitmap,
+                        char* filename)
+{
+  FT_Int  x, y, x2, y2;
+  unsigned char pix;
+  char c;
+
+
+  if (!filename) {
+    fprintf(stderr, "No textfile specified.\r\n");
+    return;
+  }
+
+  FILE *fp = fopen(filename, "w");
+  if (!fp) {
+    fprintf(stderr, "Failed to open text bitmap file %s for writing.\r\n", filename);
+    return;
+  }
+
+  /* for simplicity, we assume that `bitmap->pixel_mode' */
+  /* is `FT_PIXEL_MODE_GRAY' (i.e., not a bitmap font)   */
+
+  unsigned char *buf = bitmap->buffer;
+
+  for ( y = 0; y < bitmap->height; y++ ) {
+    for ( x = 0; x < bitmap->width; x++ ) {
+      char c = *buf++;
+
+      fputc(c, fp);fputc(c, fp);fputc(c, fp);fputc(c, fp); // TODO remove 3; just for visual scaling in Kate
+    }
+    fputc('\n', fp);
+  }
+
+  fclose(fp);
+  fprintf(stdout, "Wrote text bitmap to %s\r\n", filename);
+}
+
 
 void draw_to_textfile(  FT_Bitmap*  bitmap,
                         FT_Int type_width, FT_Int type_height,
