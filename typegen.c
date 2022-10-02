@@ -28,7 +28,7 @@ void make_type_bitmap(  FT_Bitmap *input_bitmap,
                         struct type_bitmap_8bit *output_bitmap
                         );
 
-
+void mirror_type_bitmap(  struct type_bitmap_8bit *bitmap );
 
 void bitmap_to_textfile(struct type_bitmap_8bit *output_bitmap,
                         char* filename);
@@ -45,10 +45,19 @@ void bitmap_to_STL(struct type_bitmap_8bit *bitmap,
 const int BW_THRESHOLD = 32;
 
 
-const double INCH_PER_PT = 0.013835; // per table; 72pt are 0.99612 inch
-// const double INCH_PER_PT = 0.013888; // as 1/72th of an inch
+const float MM_PER_INCH = 25.4;
+const float RS = 0.0285; // raster size in mm (28,5um)
+const float DOD = 1.6; // Depth of drive in mm
 
-int dpi = 891;//891; // make commandline parameter
+// Vary for testing
+const float TYPE_HEIGHT_IN = 0.918;
+//const float TYPE_HEIGHT_IN = 0.918 + ((float)0.25/MM_PER_INCH);
+//const float TYPE_HEIGHT_IN = 0.918 + ((float)0.50/MM_PER_INCH);
+
+
+const float INCH_PER_PT = 0.013835; // per table; 72pt are 0.99612 inch
+// const float INCH_PER_PT = 0.013888; // as 1/72th of an inch
+
 const int ptsize = 72; // make commandline parameter
 
 
@@ -124,42 +133,72 @@ int main( int argc, char**  argv )
   error = FT_New_Face( library, arguments->font_file, 0, &face );/* create face object */
   /* error handling omitted */
 
-  /* use 72pt at 891dpi */
+// MEASURED FOR CORRECTING
+  char  MEASURED_CHAR = 'E';
+  float ABOVE_CHAR_MM = 0.25;
+  //;float CHAR_HEIGHT_MM_MEASURED = 20.28; // should be BODY_SIZE(ca. 25.3mm) - ABOVE_CHAR - BELOW_CHAR
+  float BELOW_CHAR_MM = 4.78;
+
   error = FT_Set_Char_Size( face, ptsize << 6, 0, arguments->dpi, 0 );/* set char size */
   /* error handling omitted */
-
-  /* cmap selection omitted;                                        */
-  /* for simplicity we assume that the font contains a Unicode cmap */
-
   slot = face->glyph;
-
   /* load glyph image into the slot (erase previous one) */
-  error = FT_Load_Char( face, arguments->character[0], FT_LOAD_RENDER );
+  error = FT_Load_Char( face, MEASURED_CHAR, FT_LOAD_RENDER );
 
-  // metrics
+  // metrics1
+  float PX_PER_INCH = arguments->dpi;
+  float INCH_PER_PX = 1/PX_PER_INCH;
+  float MM_PER_PX = INCH_PER_PX * MM_PER_INCH;
+    printf("MM_PER_PX: %f\r\n",MM_PER_PX);
+  float body_size_inch = ptsize * INCH_PER_PT; // (body size of lead type)
+  float BODY_SIZE_MM = body_size_inch * MM_PER_INCH;
+  int char_width_px = slot->bitmap.width;
+  int char_height_px = slot->bitmap.rows;
+  float body_size_px = body_size_inch * PX_PER_INCH;
+
+
+  // SCALE CORRECTION
+  float CHAR_HEIGHT_MM = BODY_SIZE_MM - ABOVE_CHAR_MM - BELOW_CHAR_MM;
+    printf("CHAR_HEIGHT_MM: %f\r\n",CHAR_HEIGHT_MM);
+  float CHAR_HEIGHT_UNCORRECTED_MM = char_height_px * MM_PER_PX;
+    printf("CHAR_HEIGHT_UNCORRECTED_MM: %f\r\n",CHAR_HEIGHT_UNCORRECTED_MM);
+  int CORR_dpi = round(arguments->dpi *(CHAR_HEIGHT_MM / CHAR_HEIGHT_UNCORRECTED_MM));
+    printf("CORR_dpi: %d\r\n",CORR_dpi);
+  int ABOVE_CHAR_PX = (round)(ABOVE_CHAR_MM / MM_PER_PX);
+    printf("ABOVE_CHAR_PX (w/ spec dpi): %d\r\n",ABOVE_CHAR_PX);
+  int baseline_to_char_top_olddpi = slot->bitmap_top;
+    //printf("baseline_to_char_top_olddpi (w/ spec dpi): %d\r\n",baseline_to_char_top_olddpi);
+  int baseline_to_char_top_corrdpi = round(slot->bitmap_top *(CHAR_HEIGHT_MM / CHAR_HEIGHT_UNCORRECTED_MM));
+    //printf("baseline_to_char_top_corrdpi (w/ corr dpi): %d\r\n",baseline_to_char_top_corrdpi);
+  int CORR_TYPETOP_TO_BASELINE_PX = baseline_to_char_top_corrdpi + ABOVE_CHAR_PX;
+    printf("CORR_TYPETOP_TO_BASELINE_PX: %d\r\n",CORR_TYPETOP_TO_BASELINE_PX);
+
+  // corrected load
+  error = FT_Set_Char_Size( face, ptsize << 6, 0, CORR_dpi, 0 );/* set char size */
+  slot = face->glyph;
+  error = FT_Load_Char( face, arguments->character[0], FT_LOAD_RENDER );
+  char_width_px = slot->bitmap.width;
+  char_height_px = slot->bitmap.rows;
+
+  // metrics2
   int ascender_scaled = (int)(face->size->metrics.ascender>>6);
   int descender_scaled = (int)(face->size->metrics.descender>>6);
   int ascdesc_size_scaled = (int)((face->size->metrics.ascender)>>6) + 1 - (int)((face->size->metrics.descender)>>6);
 
 
-  double PX_PER_INCH = arguments->dpi;
-  double INCH_PER_PX = 1/PX_PER_INCH;
 
-  int char_width_px = slot->bitmap.width;
-  int char_height_px = slot->bitmap.rows;
-  int advanceX_px = (int)(slot->advance.x)>>6;
+
+  int advanceX_px = (int)(slot->advance.x)>>6; // round with .6 digits for accuracy? Probably fudged later anyway
   int set_width_px = advanceX_px;
 
   int body_size_scaled = ascdesc_size_scaled;
-  double body_size_inch = ptsize * INCH_PER_PT; //(body size of lead type)
-  double body_size_px = body_size_inch * PX_PER_INCH;
-  double PX_PER_SCALED = body_size_px / body_size_scaled;
-  double ascender_px = ascender_scaled * PX_PER_SCALED;
-  double descender_px = descender_scaled * PX_PER_SCALED;
+  float PX_PER_SCALED = body_size_px / body_size_scaled;
+  float ascender_px = ascender_scaled * PX_PER_SCALED;
+  float descender_px = descender_scaled * PX_PER_SCALED;
 
   int char_left_start = slot->bitmap_left;
-  int char_top_start = round(ascender_px - slot->bitmap_top);
-
+  //int char_top_start = round(ascender_px - slot->bitmap_top); // old, unscaled
+  int char_top_start = CORR_TYPETOP_TO_BASELINE_PX - slot->bitmap_top; // corrected stuff
 
 
   if (arguments->metrics) { //metrics
@@ -179,8 +218,8 @@ int main( int argc, char**  argv )
     printf("[Computed]  (Body size [scaled]): %d\r\n",body_size_scaled);
     printf("[Computed]  (Body size [in]): %f\r\n",body_size_inch);
 
-    printf("[Computed]  (Char width [in]): %f\r\n",(double)char_width_px / PX_PER_INCH);
-    printf("[Computed]  (Char height [in]): %f\r\n",(double)char_height_px / PX_PER_INCH);
+    printf("[Computed]  (Char width [in]): %f\r\n",(float)char_width_px / PX_PER_INCH);
+    printf("[Computed]  (Char height [in]): %f\r\n",(float)char_height_px / PX_PER_INCH);
 
 
     printf("----------------------\r\n");
@@ -201,10 +240,12 @@ int main( int argc, char**  argv )
   struct type_bitmap_8bit type_bm;
 
   make_type_bitmap( &slot->bitmap,
-                    set_width_px, body_size_px,
+                    set_width_px/*based on corrected dpi, advanceX*/, body_size_px /*based on uncorrected dpi, ptsize*/,
                     char_left_start, char_top_start,
                     char_width_px, char_height_px,
                     &type_bm);
+
+  mirror_type_bitmap(&type_bm);
 
   bitmap_to_textfile(&type_bm,
                      arguments->text_file);
@@ -266,6 +307,25 @@ void make_type_bitmap(  FT_Bitmap *input_bitmap,
           }*/
       }
       outbuf++;
+    }
+  }
+}
+
+
+void mirror_type_bitmap(  struct type_bitmap_8bit *bitmap )
+{
+  FT_Int  x, y;
+  int w = bitmap->width;
+  int h = bitmap->height;
+
+  unsigned char* buf = bitmap->buffer;
+  unsigned char swap;
+
+  for ( y = 0; y < h; y++ ) {
+    for ( x = 0; x < (w>>1); x++ ) {
+      swap = buf[y*w + x];
+      buf[y*w + x] = buf[y*w + w-x];
+      buf[y*w + w-x] = swap;
     }
   }
 }
@@ -447,10 +507,8 @@ void bitmap_to_STL(struct type_bitmap_8bit *bitmap,
   corner_t utl, utr, ubl, ubr, ltl, ltr, lbl, lbr;
 
 
-  const float MM_PER_INCH = 25.4;
-  float RS = 0.0285; // raster size in mm (28,5um)
-  float DOD = 1.6; // Depth of drive in mm
-  float BH = 0.918*MM_PER_INCH - DOD;// Body height in mm
+  float BH = TYPE_HEIGHT_IN*MM_PER_INCH - DOD;// Body height in mm
+
 
   unsigned char *buf = bitmap->buffer;
 
