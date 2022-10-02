@@ -36,7 +36,11 @@ void bitmap_to_textfile(struct type_bitmap_8bit *output_bitmap,
 void bitmap_to_rawbitmap(struct type_bitmap_8bit *bitmap,
                         char* filename);
 
+void bitmap_to_openscad(struct type_bitmap_8bit *bitmap,
+                        char* filename);
 
+void bitmap_to_STL(struct type_bitmap_8bit *bitmap,
+                        char* filename);
 
 const int BW_THRESHOLD = 32;
 
@@ -44,7 +48,7 @@ const int BW_THRESHOLD = 32;
 const double INCH_PER_PT = 0.013835; // per table; 72pt are 0.99612 inch
 // const double INCH_PER_PT = 0.013888; // as 1/72th of an inch
 
-const int dpi = 891; // make commandline parameter
+int dpi = 891;//891; // make commandline parameter
 const int ptsize = 72; // make commandline parameter
 
 
@@ -54,6 +58,7 @@ static struct argp_option options[] = {
   { "font",       'f', "FFILE",   0, "font input file"},
   // d - dpi
   // p - points
+  { "dpi",        'd', "DPI",     0, "dots per inch"},
   { "character",  'c', "CHAR",    0, "input character (string format)"},
 
   { "textout",    't', "TBOUT",   0, "text bitmap output file path"},
@@ -74,6 +79,7 @@ struct arguments
   int metrics;
   char *font_file;
   char *character;
+  int dpi;
   char *text_file;
   char *bitmap_file;
   char *oscad_file;
@@ -119,7 +125,7 @@ int main( int argc, char**  argv )
   /* error handling omitted */
 
   /* use 72pt at 891dpi */
-  error = FT_Set_Char_Size( face, ptsize << 6, 0, dpi, 0 );/* set char size */
+  error = FT_Set_Char_Size( face, ptsize << 6, 0, arguments->dpi, 0 );/* set char size */
   /* error handling omitted */
 
   /* cmap selection omitted;                                        */
@@ -136,7 +142,7 @@ int main( int argc, char**  argv )
   int ascdesc_size_scaled = (int)((face->size->metrics.ascender)>>6) + 1 - (int)((face->size->metrics.descender)>>6);
 
 
-  double PX_PER_INCH = dpi;
+  double PX_PER_INCH = arguments->dpi;
   double INCH_PER_PX = 1/PX_PER_INCH;
 
   int char_width_px = slot->bitmap.width;
@@ -206,7 +212,16 @@ int main( int argc, char**  argv )
   bitmap_to_rawbitmap(&type_bm,
                      arguments->bitmap_file);
 
+  bitmap_to_openscad(&type_bm,
+                     arguments->oscad_file);
+
+  bitmap_to_STL(&type_bm,
+                     arguments->stl_file);
+
+
+
   FT_Done_Face    ( face );
+
   FT_Done_FreeType( library );
 
   return 0;
@@ -255,6 +270,7 @@ void make_type_bitmap(  FT_Bitmap *input_bitmap,
   }
 }
 
+
 void bitmap_to_textfile(struct type_bitmap_8bit *bitmap,
                         char* filename)
 {
@@ -287,7 +303,6 @@ void bitmap_to_textfile(struct type_bitmap_8bit *bitmap,
   fclose(fp);
   fprintf(stdout, "Wrote text bitmap to %s\r\n", filename);
 }
-
 
 
 void bitmap_to_rawbitmap(struct type_bitmap_8bit *bitmap,
@@ -328,6 +343,163 @@ void bitmap_to_rawbitmap(struct type_bitmap_8bit *bitmap,
 }
 
 
+void bitmap_to_openscad(struct type_bitmap_8bit *bitmap,
+                        char* filename)
+{
+  FT_Int  x, y, x2, y2;
+  unsigned char pix;
+  char c;
+
+
+  if (!filename) {
+    fprintf(stderr, "No OpenSCAD file specified.\r\n");
+    return;
+  }
+
+  FILE *fp = fopen(filename, "w");
+  if (!fp) {
+    fprintf(stderr, "Failed to open SCAD file %s for writing.\r\n", filename);
+    return;
+  }
+
+  fprintf(fp, "MM_PER_INCH = 25.4;\r\n");
+  fprintf(fp, "TH = 0.918 * MM_PER_INCH; // standard type height in mm\r\n");
+  fprintf(fp, "RS = 0.0285; // raster size in mm (28.5um)\r\n");
+  //fprintf(fp, "DOD = RS;\r\n");
+  fprintf(fp, "DOD = 0.065 * MM_PER_INCH;// depth of drive in mm\r\n");
+  fprintf(fp, "BH = TH - DOD; // Body height in mm;\r\n");
+  fprintf(fp, "\r\n");
+
+
+  unsigned char *buf = bitmap->buffer;
+
+  // block
+  fprintf(fp, "translate([0,-RS*%d,-BH]) cube([RS*%d,RS*%d,BH]);\r\n",
+          bitmap->height, bitmap->width, bitmap->height);
+
+  // char
+  fprintf(fp, "union() {\r\n");
+
+  for ( y = 0; y < bitmap->height; y++ ) {
+    for ( x = 0; x < bitmap->width; x++ ) {
+      if(*buf++) {
+        fprintf(fp, "translate([RS*%d,-RS*%d,0]) cube([RS,RS,DOD]);\r\n",x,y);
+      }
+    }
+  }
+
+  fprintf(fp, "}\r\n");
+
+  fclose(fp);
+  fprintf(stdout, "Wrote OpenSCAD code to %s\r\n", filename);
+}
+
+
+#define STL_triangle_write(Nx,  Ny,  Nz, \
+                           v1, v2, v3) \
+( { \
+    TRI = (struct stl_binary_triangle) { Nx, Ny, Nz, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, 0}; \
+    fwrite((void*)&TRI, 1, 50, fp); \
+    tri_cnt++; \
+  } )
+
+
+void bitmap_to_STL(struct type_bitmap_8bit *bitmap,
+                        char* filename)
+{
+  FT_Int  x, y;
+  int i;
+  int w = bitmap->width;
+
+
+  if (!filename) {
+    fprintf(stderr, "No STL file specified.\r\n");
+    return;
+  }
+
+  FILE *fp = fopen(filename, "w");
+  if (!fp) {
+    fprintf(stderr, "Failed to open STL file %s for writing.\r\n", filename);
+    return;
+  }
+
+  for(i=0;i<80;i++)
+    fputc('x',fp);
+
+  struct stl_binary_triangle {
+    float Nx;  float Ny;  float Nz;
+    float V1x; float V1y; float V1z;
+    float V2x; float V2y; float V2z;
+    float V3x; float V3y; float V3z;
+    short int attr_cnt;
+  };
+  
+  struct stl_binary_triangle TRI;
+
+  unsigned int tri_cnt = 0;
+  fwrite((void*)&tri_cnt, 1, 4, fp); // space for number of triangles
+
+  // cube corners: upper/lower;top/botton;left/right
+  typedef struct corner {
+    float x, y, z;
+  } corner_t;
+  corner_t utl, utr, ubl, ubr, ltl, ltr, lbl, lbr;
+  // cube with sizes x=1,y=2,z=3
+  utl = (corner_t) { 0,  0, 3 };  utr = (corner_t) { 1,  0, 3 };
+  ubl = (corner_t) { 0, -2, 3 };  ubr = (corner_t) { 1, -2, 3 };
+
+  ltl = (corner_t) { 0,  0, 0 };  ltr = (corner_t) { 1,  0, 0 };
+  lbl = (corner_t) { 0, -2, 0 };  lbr = (corner_t) { 1, -2, 0 };
+
+//  STL_triangle_write(n,n,n,   v,v,v);
+
+  // upper face
+  STL_triangle_write(0,0,1,   utr, utl, ubl);
+  STL_triangle_write(0,0,1,   utr, ubl, ubr);
+
+  // lower face
+  STL_triangle_write(0,0,-1,   ltr, lbl, ltl);
+  STL_triangle_write(0,0,-1,   ltr, lbr, lbl);
+
+  // left face
+  STL_triangle_write(-1,0,0,   ubl, utl, ltl);
+  STL_triangle_write(-1,0,0,   ubl, ltl, lbl);
+
+  // right face
+//  STL_triangle_write(1,0,0,   ubr, ltr, utr);
+//  STL_triangle_write(1,0,0,   ubr, lbr, ltr);
+
+  // top face
+  STL_triangle_write(0,1,0,   utl, utr, ltr);
+  STL_triangle_write(0,1,0,   utl, ltr, ltl);
+
+  // bottom face
+  STL_triangle_write(0,-1,0,   ubl, lbr, ubr);
+  STL_triangle_write(0,-1,0,   ubl, lbl, lbr);
+
+/*
+
+  unsigned char *buf = bitmap->buffer;
+
+  // char
+
+
+  for ( y = 0; y < bitmap->height; y++ ) {
+    for ( x = 0; x < bitmap->width; x++ ) {
+      if(*buf++) {
+
+
+      }
+    }
+  }
+*/
+  fseek(fp, 80, SEEK_SET);
+  fwrite((void*)&tri_cnt, 1, 4, fp);
+  fclose(fp);
+
+  fprintf(stdout, "Wrote ASCII STL data to %s\r\n", filename);
+}
+
 static error_t parse_opt (int key, char *arg, struct argp_state *state)
 {
   /* Get the input argument from argp_parse, which we
@@ -344,6 +516,9 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state)
       break;
     case 'c':
       arguments->character = arg;
+      break;
+    case 'd':
+      arguments->dpi = atoi(arg);
       break;
     case 't':
       arguments->text_file = arg;
