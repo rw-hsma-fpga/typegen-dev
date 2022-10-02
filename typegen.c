@@ -410,6 +410,7 @@ void bitmap_to_STL(struct type_bitmap_8bit *bitmap,
   FT_Int  x, y;
   int i;
   int w = bitmap->width;
+  int h = bitmap->height;
 
 
   if (!filename) {
@@ -474,10 +475,6 @@ void bitmap_to_STL(struct type_bitmap_8bit *bitmap,
         STL_triangle_write(0,0,1,   utr, utl, ubl);
         STL_triangle_write(0,0,1,   utr, ubl, ubr);
 
-        // lower face
-        STL_triangle_write(0,0,-1,   ltr, lbl, ltl);
-        STL_triangle_write(0,0,-1,   ltr, lbr, lbl);
-
         // left face
         if ((x==0) || (buf[ ((y)*w) + (x-1) ]==0)) {
           STL_triangle_write(-1,0,0,   ubl, utl, ltl);
@@ -503,8 +500,43 @@ void bitmap_to_STL(struct type_bitmap_8bit *bitmap,
         }
 
       }
+      else {
+                // upper faces for 0s (body)
+        STL_triangle_write(0,0,1,   ltr, lbl, ltl);
+        STL_triangle_write(0,0,1,   ltr, lbr, lbl);
+
+      }
     }
   }
+
+
+  utl = (corner_t) { 0,     0,   0 };   utr = (corner_t) { RS*w,     0,   0 };
+  ubl = (corner_t) { 0, -RS*h,   0 };   ubr = (corner_t) { RS*w, -RS*h,   0 };
+
+  ltl = (corner_t) { 0,     0, -BH };   ltr = (corner_t) { RS*w,     0, -BH };
+  lbl = (corner_t) { 0, -RS*h, -BH };   lbr = (corner_t) { RS*w, -RS*h, -BH };
+
+  // lower face
+  STL_triangle_write(0,0,-1,   ltr, lbl, ltl);
+  STL_triangle_write(0,0,-1,   ltr, lbr, lbl);
+
+  // left face
+  STL_triangle_write(-1,0,0,   ubl, utl, ltl);
+  STL_triangle_write(-1,0,0,   ubl, ltl, lbl);
+
+  // right face
+  STL_triangle_write(1,0,0,   ubr, ltr, utr);
+  STL_triangle_write(1,0,0,   ubr, lbr, ltr);
+
+  // top face
+  STL_triangle_write(0,1,0,   utl, utr, ltr);
+  STL_triangle_write(0,1,0,   utl, ltr, ltl);
+
+  // bottom face
+  STL_triangle_write(0,-1,0,   ubl, lbr, ubr);
+  STL_triangle_write(0,-1,0,   ubl, lbl, lbr);
+
+
 
   fprintf(stdout, "tri_cnt is %d\r\n", tri_cnt);
 
