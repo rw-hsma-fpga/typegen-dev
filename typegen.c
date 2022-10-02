@@ -444,60 +444,75 @@ void bitmap_to_STL(struct type_bitmap_8bit *bitmap,
     float x, y, z;
   } corner_t;
   corner_t utl, utr, ubl, ubr, ltl, ltr, lbl, lbr;
-  // cube with sizes x=1,y=2,z=3
-  utl = (corner_t) { 0,  0, 3 };  utr = (corner_t) { 1,  0, 3 };
-  ubl = (corner_t) { 0, -2, 3 };  ubr = (corner_t) { 1, -2, 3 };
 
-  ltl = (corner_t) { 0,  0, 0 };  ltr = (corner_t) { 1,  0, 0 };
-  lbl = (corner_t) { 0, -2, 0 };  lbr = (corner_t) { 1, -2, 0 };
 
-//  STL_triangle_write(n,n,n,   v,v,v);
-
-  // upper face
-  STL_triangle_write(0,0,1,   utr, utl, ubl);
-  STL_triangle_write(0,0,1,   utr, ubl, ubr);
-
-  // lower face
-  STL_triangle_write(0,0,-1,   ltr, lbl, ltl);
-  STL_triangle_write(0,0,-1,   ltr, lbr, lbl);
-
-  // left face
-  STL_triangle_write(-1,0,0,   ubl, utl, ltl);
-  STL_triangle_write(-1,0,0,   ubl, ltl, lbl);
-
-  // right face
-//  STL_triangle_write(1,0,0,   ubr, ltr, utr);
-//  STL_triangle_write(1,0,0,   ubr, lbr, ltr);
-
-  // top face
-  STL_triangle_write(0,1,0,   utl, utr, ltr);
-  STL_triangle_write(0,1,0,   utl, ltr, ltl);
-
-  // bottom face
-  STL_triangle_write(0,-1,0,   ubl, lbr, ubr);
-  STL_triangle_write(0,-1,0,   ubl, lbl, lbr);
-
-/*
+  const float MM_PER_INCH = 25.4;
+  float RS = 0.0285; // raster size in mm (28,5um)
+  float DOD = 1.6; // Depth of drive in mm
+  float BH = 0.918*MM_PER_INCH - DOD;// Body height in mm
 
   unsigned char *buf = bitmap->buffer;
 
-  // char
 
 
   for ( y = 0; y < bitmap->height; y++ ) {
     for ( x = 0; x < bitmap->width; x++ ) {
-      if(*buf++) {
 
+      utl = (corner_t) { RS*x,     -RS*y, DOD };   utr = (corner_t) { RS*(x+1),     -RS*y, DOD };
+      ubl = (corner_t) { RS*x, -RS*(y+1), DOD };   ubr = (corner_t) { RS*(x+1), -RS*(y+1), DOD };
+
+      ltl = (corner_t) { RS*x,     -RS*y, 0   };   ltr = (corner_t) { RS*(x+1),     -RS*y, 0   };
+      lbl = (corner_t) { RS*x, -RS*(y+1), 0   };   lbr = (corner_t) { RS*(x+1), -RS*(y+1), 0   };
+
+      //fprintf(stdout, ".. X: %d   Y: %d\r\n", x, y);
+
+      if ( buf[y*w+x] ) {
+
+        //fprintf(stdout, "X: %d   Y: %d\r\n", x, y);
+
+        // upper face
+        STL_triangle_write(0,0,1,   utr, utl, ubl);
+        STL_triangle_write(0,0,1,   utr, ubl, ubr);
+
+        // lower face
+        STL_triangle_write(0,0,-1,   ltr, lbl, ltl);
+        STL_triangle_write(0,0,-1,   ltr, lbr, lbl);
+
+        // left face
+        if ((x==0) || (buf[ ((y)*w) + (x-1) ]==0)) {
+          STL_triangle_write(-1,0,0,   ubl, utl, ltl);
+          STL_triangle_write(-1,0,0,   ubl, ltl, lbl);
+        }
+
+        // right face
+        if ((x==(bitmap->width-1)) || (buf[ ((y)*w) + (x+1) ]==0)) {
+          STL_triangle_write(1,0,0,   ubr, ltr, utr);
+          STL_triangle_write(1,0,0,   ubr, lbr, ltr);
+        }
+
+        // top face
+        if ((y==0) || (buf[ ((y-1)*w) + (x) ]==0)) {
+          STL_triangle_write(0,1,0,   utl, utr, ltr);
+          STL_triangle_write(0,1,0,   utl, ltr, ltl);
+        }
+
+        // bottom face
+        if ((y==(bitmap->height-1)) || (buf[ ((y+1)*w) + (x) ]==0)) {
+          STL_triangle_write(0,-1,0,   ubl, lbr, ubr);
+          STL_triangle_write(0,-1,0,   ubl, lbl, lbr);
+        }
 
       }
     }
   }
-*/
+
+  fprintf(stdout, "tri_cnt is %d\r\n", tri_cnt);
+
   fseek(fp, 80, SEEK_SET);
   fwrite((void*)&tri_cnt, 1, 4, fp);
   fclose(fp);
 
-  fprintf(stdout, "Wrote ASCII STL data to %s\r\n", filename);
+  fprintf(stdout, "Wrote binary STL data to %s\r\n", filename);
 }
 
 static error_t parse_opt (int key, char *arg, struct argp_state *state)
@@ -554,3 +569,37 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state)
   return 0;
 }
 
+/*
+  // cube with sizes x=1,y=2,z=3
+  utl = (corner_t) { 0,  0, 3 };  utr = (corner_t) { 1,  0, 3 };
+  ubl = (corner_t) { 0, -2, 3 };  ubr = (corner_t) { 1, -2, 3 };
+
+  ltl = (corner_t) { 0,  0, 0 };  ltr = (corner_t) { 1,  0, 0 };
+  lbl = (corner_t) { 0, -2, 0 };  lbr = (corner_t) { 1, -2, 0 };
+
+//  STL_triangle_write(n,n,n,   v,v,v);
+
+  // upper face
+  STL_triangle_write(0,0,1,   utr, utl, ubl);
+  STL_triangle_write(0,0,1,   utr, ubl, ubr);
+
+  // lower face
+  STL_triangle_write(0,0,-1,   ltr, lbl, ltl);
+  STL_triangle_write(0,0,-1,   ltr, lbr, lbl);
+
+  // left face
+  STL_triangle_write(-1,0,0,   ubl, utl, ltl);
+  STL_triangle_write(-1,0,0,   ubl, ltl, lbl);
+
+  // right face
+  STL_triangle_write(1,0,0,   ubr, ltr, utr);
+  STL_triangle_write(1,0,0,   ubr, lbr, ltr);
+
+  // top face
+  STL_triangle_write(0,1,0,   utl, utr, ltr);
+  STL_triangle_write(0,1,0,   utl, ltr, ltl);
+
+  // bottom face
+  STL_triangle_write(0,-1,0,   ubl, lbr, ubr);
+  STL_triangle_write(0,-1,0,   ubl, lbl, lbr);
+  */
