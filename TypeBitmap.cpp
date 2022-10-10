@@ -111,11 +111,34 @@ bool TypeBitmap::is_loaded()
 }
 
 
+typedef struct pos3d
+{
+    float x, y, z;
+} pos3d_t;
+
+
+struct stl_binary_triangle
+{
+    float Nx;
+    float Ny;
+    float Nz;
+    float V1x;
+    float V1y;
+    float V1z;
+    float V2x;
+    float V2y;
+    float V2z;
+    float V3x;
+    float V3y;
+    float V3z;
+    short int attr_cnt;
+};
+
+
 // define for effective inlining
-#define STL_triangle_write(Nx, Ny, Nz,                                                                       \
-                           v1, v2, v3)                                                                       \
+#define STL_triangle_write(N, v1, v2, v3)                                                                    \
   ({                                                                                                         \
-    TRI = (struct stl_binary_triangle){Nx, Ny, Nz, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, 0}; \
+    TRI = (struct stl_binary_triangle){N.x, N.y, N.z, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, 0}; \
     stl_out.write((const char*)&TRI, 50); \
     tri_cnt++;                                                                                               \
   })
@@ -136,6 +159,9 @@ int TypeBitmap::export_STL(std::string filename)
     int h = height;
     unsigned int tri_cnt = 0;
 
+    unsigned char *buf = (unsigned char*)bitmap;
+
+
     if (filename.empty())
     {
         std::cerr << "No STL file specified." << std::endl;
@@ -152,128 +178,103 @@ int TypeBitmap::export_STL(std::string filename)
     for (i = 0; i < 80; i++)
         stl_out.put('x');
 
-    struct stl_binary_triangle
-    {
-        float Nx;
-        float Ny;
-        float Nz;
-        float V1x;
-        float V1y;
-        float V1z;
-        float V2x;
-        float V2y;
-        float V2z;
-        float V3x;
-        float V3y;
-        float V3z;
-        short int attr_cnt;
-    };
 
     struct stl_binary_triangle TRI;
 
     stl_out.write((const char*)&tri_cnt, 4); // space for number of triangles
 
   // cube corners: upper/lower;top/botton;left/right
-  typedef struct corner
-  {
-    float x, y, z;
-  } corner_t;
-  corner_t utl, utr, ubl, ubr, ltl, ltr, lbl, lbr;
 
-  unsigned char *buf = (unsigned char*)bitmap;
+    pos3d_t utl, utr, ubl, ubr, ltl, ltr, lbl, lbr;
 
-  for (y = 0; y < height; y++)
-  {
-    for (x = 0; x < width; x++)
-    {
+    // normal vectors: X, Y, Z, positive, negative
+    pos3d_t Xp = (pos3d_t){ 1,  0,  0};  pos3d_t Xn = (pos3d_t){-1,  0,  0};
+    pos3d_t Yp = (pos3d_t){ 0,  1,  0};  pos3d_t Yn = (pos3d_t){ 0, -1,  0};
+    pos3d_t Zp = (pos3d_t){ 0,  0,  1};  pos3d_t Zn = (pos3d_t){ 0,  0, -1};
 
-      utl = (corner_t){RS * x, -RS * y, DOD};
-      utr = (corner_t){RS * (x + 1), -RS * y, DOD};
-      ubl = (corner_t){RS * x, -RS * (y + 1), DOD};
-      ubr = (corner_t){RS * (x + 1), -RS * (y + 1), DOD};
+    for (y = 0; y < height; y++) {
+        for (x = 0; x < width; x++) {
 
-      ltl = (corner_t){RS * x, -RS * y, 0};
-      ltr = (corner_t){RS * (x + 1), -RS * y, 0};
-      lbl = (corner_t){RS * x, -RS * (y + 1), 0};
-      lbr = (corner_t){RS * (x + 1), -RS * (y + 1), 0};
+            // pixel cube corners - assuming cubes are going up from Z=0 to Z=+(depth of drive)
+            utl = (pos3d_t){RS * x, -RS * y, DOD};
+            utr = (pos3d_t){RS * (x + 1), -RS * y, DOD};
+            ubl = (pos3d_t){RS * x, -RS * (y + 1), DOD};
+            ubr = (pos3d_t){RS * (x + 1), -RS * (y + 1), DOD};
 
-      // fprintf(stdout, ".. X: %d   Y: %d\r\n", x, y);
+            ltl = (pos3d_t){RS * x, -RS * y, 0};
+            ltr = (pos3d_t){RS * (x + 1), -RS * y, 0};
+            lbl = (pos3d_t){RS * x, -RS * (y + 1), 0};
+            lbr = (pos3d_t){RS * (x + 1), -RS * (y + 1), 0};
 
-      if (buf[y * w + x])
-      {
+            if (buf[y * w + x]) {
 
-        // fprintf(stdout, "X: %d   Y: %d\r\n", x, y);
+                // upper face
+                STL_triangle_write(Zp, utr, utl, ubl);
+                STL_triangle_write(Zp, utr, ubl, ubr);
 
-        // upper face
-        STL_triangle_write(0, 0, 1, utr, utl, ubl);
-        STL_triangle_write(0, 0, 1, utr, ubl, ubr);
+                // left face
+                if ((x == 0) || (buf[((y)*w) + (x - 1)] == 0)) {
+                    STL_triangle_write(Xn, ubl, utl, ltl);
+                    STL_triangle_write(Xn, ubl, ltl, lbl);
+                }
 
-        // left face
-        if ((x == 0) || (buf[((y)*w) + (x - 1)] == 0))
-        {
-          STL_triangle_write(-1, 0, 0, ubl, utl, ltl);
-          STL_triangle_write(-1, 0, 0, ubl, ltl, lbl);
+                // right face
+                if ((x == (width - 1)) || (buf[((y)*w) + (x + 1)] == 0)) {
+                    STL_triangle_write(Xp, ubr, ltr, utr);
+                    STL_triangle_write(Xp, ubr, lbr, ltr);
+                }
+
+                // top face
+                if ((y == 0) || (buf[((y - 1) * w) + (x)] == 0)) {
+                    STL_triangle_write(Yp, utl, utr, ltr);
+                    STL_triangle_write(Yp, utl, ltr, ltl);
+                }
+
+                // bottom face
+                if ((y == (height - 1)) || (buf[((y + 1) * w) + (x)] == 0)) {
+                    STL_triangle_write(Yn, ubl, lbr, ubr);
+                    STL_triangle_write(Yn, ubl, lbl, lbr);
+                }
+            }
+            else {
+                // upper faces for 0s (body)
+                STL_triangle_write(Zp, ltr, lbl, ltl);
+                STL_triangle_write(Zp, ltr, lbr, lbl);
+            }
         }
-
-        // right face
-        if ((x == (width - 1)) || (buf[((y)*w) + (x + 1)] == 0))
-        {
-          STL_triangle_write(1, 0, 0, ubr, ltr, utr);
-          STL_triangle_write(1, 0, 0, ubr, lbr, ltr);
-        }
-
-        // top face
-        if ((y == 0) || (buf[((y - 1) * w) + (x)] == 0))
-        {
-          STL_triangle_write(0, 1, 0, utl, utr, ltr);
-          STL_triangle_write(0, 1, 0, utl, ltr, ltl);
-        }
-
-        // bottom face
-        if ((y == (height - 1)) || (buf[((y + 1) * w) + (x)] == 0))
-        {
-          STL_triangle_write(0, -1, 0, ubl, lbr, ubr);
-          STL_triangle_write(0, -1, 0, ubl, lbl, lbr);
-        }
-      }
-      else
-      {
-        // upper faces for 0s (body)
-        STL_triangle_write(0, 0, 1, ltr, lbl, ltl);
-        STL_triangle_write(0, 0, 1, ltr, lbr, lbl);
-      }
     }
-  }
 
-  utl = (corner_t){0, 0, 0};
-  utr = (corner_t){RS * w, 0, 0};
-  ubl = (corner_t){0, -RS * h, 0};
-  ubr = (corner_t){RS * w, -RS * h, 0};
+    // lower type cupe corners - assuming cube goes down from Z=0 to Z=-(type height - depth of drive)
 
-  ltl = (corner_t){0, 0, -BH};
-  ltr = (corner_t){RS * w, 0, -BH};
-  lbl = (corner_t){0, -RS * h, -BH};
-  lbr = (corner_t){RS * w, -RS * h, -BH};
+    utl = (pos3d_t){0, 0, 0};
+    utr = (pos3d_t){RS * w, 0, 0};
+    ubl = (pos3d_t){0, -RS * h, 0};
+    ubr = (pos3d_t){RS * w, -RS * h, 0};
 
-  // lower face
-  STL_triangle_write(0, 0, -1, ltr, lbl, ltl);
-  STL_triangle_write(0, 0, -1, ltr, lbr, lbl);
+    ltl = (pos3d_t){0, 0, -BH};
+    ltr = (pos3d_t){RS * w, 0, -BH};
+    lbl = (pos3d_t){0, -RS * h, -BH};
+    lbr = (pos3d_t){RS * w, -RS * h, -BH};
 
-  // left face
-  STL_triangle_write(-1, 0, 0, ubl, utl, ltl);
-  STL_triangle_write(-1, 0, 0, ubl, ltl, lbl);
+    // lower face
+    STL_triangle_write(Zn, ltr, lbl, ltl);
+    STL_triangle_write(Zn, ltr, lbr, lbl);
 
-  // right face
-  STL_triangle_write(1, 0, 0, ubr, ltr, utr);
-  STL_triangle_write(1, 0, 0, ubr, lbr, ltr);
+    // left face
+    STL_triangle_write(Xn, ubl, utl, ltl);
+    STL_triangle_write(Xn, ubl, ltl, lbl);
 
-  // top face
-  STL_triangle_write(0, 1, 0, utl, utr, ltr);
-  STL_triangle_write(0, 1, 0, utl, ltr, ltl);
+    // right face
+    STL_triangle_write(Xp, ubr, ltr, utr);
+    STL_triangle_write(Xp, ubr, lbr, ltr);
 
-  // bottom face
-  STL_triangle_write(0, -1, 0, ubl, lbr, ubr);
-  STL_triangle_write(0, -1, 0, ubl, lbl, lbr);
+    // top face
+    STL_triangle_write(Yp, utl, utr, ltr);
+    STL_triangle_write(Yp, utl, ltr, ltl);
+
+    // bottom face
+    STL_triangle_write(Yn, ubl, lbr, ubr);
+    STL_triangle_write(Yn, ubl, lbl, lbr);
 
     std::cout << "Triangle count is " << tri_cnt << std::endl;
 
@@ -282,10 +283,7 @@ int TypeBitmap::export_STL(std::string filename)
     stl_out.close();
 
 
-
-
-
-    std::cout << "Wrote binary STL data to" << " __" << filename << std::endl;
+    std::cout << "Wrote binary STL data to" << filename << std::endl;
     fprintf(stdout, "---------------------\r\n");
     fprintf(stdout, "Exported STL metrics:\r\n");
     fprintf(stdout, "Type height   %6.4f inch  |  %6.3f mm\r\n", TYPE_HEIGHT_IN, TYPE_HEIGHT_IN*MM_PER_INCH);
