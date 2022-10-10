@@ -18,6 +18,7 @@ class TypeBitmap {
         int load(std::string filename);
         void unload();
         bool is_loaded();
+        int export_STL(std::string filename);
 };
 
 #endif // TYPEBITMAP_H

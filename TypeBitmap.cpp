@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <stdio.h>
 
 TypeBitmap::TypeBitmap() : loaded(false), width(0), height(0), bitmap(NULL) {}
 
@@ -107,4 +108,186 @@ void TypeBitmap::unload()
 bool TypeBitmap::is_loaded()
 {
     return loaded;
+}
+
+
+// define for effective inlining
+#define STL_triangle_write(Nx, Ny, Nz,                                                                       \
+                           v1, v2, v3)                                                                       \
+  ({                                                                                                         \
+    TRI = (struct stl_binary_triangle){Nx, Ny, Nz, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, 0}; \
+    fwrite((void *)&TRI, 1, 50, fp);                                                                         \
+    tri_cnt++;                                                                                               \
+  })
+
+
+int TypeBitmap::export_STL(std::string filename)
+{
+  const float TYPE_HEIGHT_IN = 0.918;
+  const float MM_PER_INCH = 25.4;
+  const float RS = 0.0285; // raster size in mm (28,5um)
+  const float DOD = 1.6;   // Depth of drive in mm
+
+  int x, y;
+  int i;
+  int w = width;
+  int h = height;
+
+  if (filename.empty())
+  {
+    fprintf(stderr, "No STL file specified.\r\n");
+    return -1;
+  }
+
+  FILE *fp = fopen(filename.c_str(), "w");
+  if (!fp)
+  {
+    fprintf(stderr, "Failed to open STL file %s for writing.\r\n", filename.c_str());
+    return -1;
+  }
+
+  for (i = 0; i < 80; i++)
+    fputc('x', fp);
+
+  struct stl_binary_triangle
+  {
+    float Nx;
+    float Ny;
+    float Nz;
+    float V1x;
+    float V1y;
+    float V1z;
+    float V2x;
+    float V2y;
+    float V2z;
+    float V3x;
+    float V3y;
+    float V3z;
+    short int attr_cnt;
+  };
+
+  struct stl_binary_triangle TRI;
+
+  unsigned int tri_cnt = 0;
+  fwrite((void *)&tri_cnt, 1, 4, fp); // space for number of triangles
+
+  // cube corners: upper/lower;top/botton;left/right
+  typedef struct corner
+  {
+    float x, y, z;
+  } corner_t;
+  corner_t utl, utr, ubl, ubr, ltl, ltr, lbl, lbr;
+
+  float BH = TYPE_HEIGHT_IN * MM_PER_INCH - DOD; // Body height in mm
+
+  unsigned char *buf = (unsigned char*)bitmap;
+
+  for (y = 0; y < height; y++)
+  {
+    for (x = 0; x < width; x++)
+    {
+
+      utl = (corner_t){RS * x, -RS * y, DOD};
+      utr = (corner_t){RS * (x + 1), -RS * y, DOD};
+      ubl = (corner_t){RS * x, -RS * (y + 1), DOD};
+      ubr = (corner_t){RS * (x + 1), -RS * (y + 1), DOD};
+
+      ltl = (corner_t){RS * x, -RS * y, 0};
+      ltr = (corner_t){RS * (x + 1), -RS * y, 0};
+      lbl = (corner_t){RS * x, -RS * (y + 1), 0};
+      lbr = (corner_t){RS * (x + 1), -RS * (y + 1), 0};
+
+      // fprintf(stdout, ".. X: %d   Y: %d\r\n", x, y);
+
+      if (buf[y * w + x])
+      {
+
+        // fprintf(stdout, "X: %d   Y: %d\r\n", x, y);
+
+        // upper face
+        STL_triangle_write(0, 0, 1, utr, utl, ubl);
+        STL_triangle_write(0, 0, 1, utr, ubl, ubr);
+
+        // left face
+        if ((x == 0) || (buf[((y)*w) + (x - 1)] == 0))
+        {
+          STL_triangle_write(-1, 0, 0, ubl, utl, ltl);
+          STL_triangle_write(-1, 0, 0, ubl, ltl, lbl);
+        }
+
+        // right face
+        if ((x == (width - 1)) || (buf[((y)*w) + (x + 1)] == 0))
+        {
+          STL_triangle_write(1, 0, 0, ubr, ltr, utr);
+          STL_triangle_write(1, 0, 0, ubr, lbr, ltr);
+        }
+
+        // top face
+        if ((y == 0) || (buf[((y - 1) * w) + (x)] == 0))
+        {
+          STL_triangle_write(0, 1, 0, utl, utr, ltr);
+          STL_triangle_write(0, 1, 0, utl, ltr, ltl);
+        }
+
+        // bottom face
+        if ((y == (height - 1)) || (buf[((y + 1) * w) + (x)] == 0))
+        {
+          STL_triangle_write(0, -1, 0, ubl, lbr, ubr);
+          STL_triangle_write(0, -1, 0, ubl, lbl, lbr);
+        }
+      }
+      else
+      {
+        // upper faces for 0s (body)
+        STL_triangle_write(0, 0, 1, ltr, lbl, ltl);
+        STL_triangle_write(0, 0, 1, ltr, lbr, lbl);
+      }
+    }
+  }
+
+  utl = (corner_t){0, 0, 0};
+  utr = (corner_t){RS * w, 0, 0};
+  ubl = (corner_t){0, -RS * h, 0};
+  ubr = (corner_t){RS * w, -RS * h, 0};
+
+  ltl = (corner_t){0, 0, -BH};
+  ltr = (corner_t){RS * w, 0, -BH};
+  lbl = (corner_t){0, -RS * h, -BH};
+  lbr = (corner_t){RS * w, -RS * h, -BH};
+
+  // lower face
+  STL_triangle_write(0, 0, -1, ltr, lbl, ltl);
+  STL_triangle_write(0, 0, -1, ltr, lbr, lbl);
+
+  // left face
+  STL_triangle_write(-1, 0, 0, ubl, utl, ltl);
+  STL_triangle_write(-1, 0, 0, ubl, ltl, lbl);
+
+  // right face
+  STL_triangle_write(1, 0, 0, ubr, ltr, utr);
+  STL_triangle_write(1, 0, 0, ubr, lbr, ltr);
+
+  // top face
+  STL_triangle_write(0, 1, 0, utl, utr, ltr);
+  STL_triangle_write(0, 1, 0, utl, ltr, ltl);
+
+  // bottom face
+  STL_triangle_write(0, -1, 0, ubl, lbr, ubr);
+  STL_triangle_write(0, -1, 0, ubl, lbl, lbr);
+
+  fprintf(stdout, "tri_cnt is %d\r\n", tri_cnt);
+
+  fseek(fp, 80, SEEK_SET);
+  fwrite((void *)&tri_cnt, 1, 4, fp);
+  fclose(fp);
+
+  fprintf(stdout, "Wrote binary STL data to %s\r\n", filename.c_str());
+  fprintf(stdout, "---------------------\r\n");
+  fprintf(stdout, "Exported STL metrics:\r\n");
+  fprintf(stdout, "Type height   %6.4f inch  |  %6.3f mm\r\n", TYPE_HEIGHT_IN, TYPE_HEIGHT_IN*MM_PER_INCH);
+  fprintf(stdout, "Body size     %6.4f inch  |  %6.3f mm\r\n", (h*RS)/MM_PER_INCH, h*RS);
+  fprintf(stdout, "Set width     %6.4f inch  |  %6.3f mm\r\n", (w*RS)/MM_PER_INCH, w*RS);
+
+
+    return 0;
 }
