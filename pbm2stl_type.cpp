@@ -7,8 +7,8 @@
 int main()
 {
 
-    std::string bitmap_file = "edia.pbm";
-    std::string stl_file = "edia.stl";
+    std::string bitmap_file = "g.pbm";
+    std::string stl_file = "g_new.stl";
 
     TypeBitmap *BM = new TypeBitmap(bitmap_file);
     BM->export_STL(stl_file);

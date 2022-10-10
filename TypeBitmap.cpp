@@ -116,60 +116,62 @@ bool TypeBitmap::is_loaded()
                            v1, v2, v3)                                                                       \
   ({                                                                                                         \
     TRI = (struct stl_binary_triangle){Nx, Ny, Nz, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, 0}; \
-    fwrite((void *)&TRI, 1, 50, fp);                                                                         \
+    stl_out.write((const char*)&TRI, 50); \
     tri_cnt++;                                                                                               \
   })
 
 
 int TypeBitmap::export_STL(std::string filename)
 {
-  const float TYPE_HEIGHT_IN = 0.918;
-  const float MM_PER_INCH = 25.4;
-  const float RS = 0.0285; // raster size in mm (28,5um)
-  const float DOD = 1.6;   // Depth of drive in mm
+    const float TYPE_HEIGHT_IN = 0.918;
+    const float MM_PER_INCH = 25.4;
+    const float RS = 0.0285; // raster size in mm (28,5um)
+    const float DOD = 1.6;   // Depth of drive in mm
 
-  int x, y;
-  int i;
-  int w = width;
-  int h = height;
+    float BH = TYPE_HEIGHT_IN * MM_PER_INCH - DOD; // Body height in mm
 
-  if (filename.empty())
-  {
-    fprintf(stderr, "No STL file specified.\r\n");
-    return -1;
-  }
+    int x, y;
+    int i;
+    int w = width;
+    int h = height;
+    unsigned int tri_cnt = 0;
 
-  FILE *fp = fopen(filename.c_str(), "w");
-  if (!fp)
-  {
-    fprintf(stderr, "Failed to open STL file %s for writing.\r\n", filename.c_str());
-    return -1;
-  }
+    if (filename.empty())
+    {
+        std::cerr << "No STL file specified." << std::endl;
+        return -1;
+    }
 
-  for (i = 0; i < 80; i++)
-    fputc('x', fp);
+    std::ofstream stl_out(filename, std::ios::binary);
+    if (!stl_out.is_open()) {
+        std::cerr << "ERROR: Could not open STL file for writing." << std::endl;
+        return -1;
+    }    
 
-  struct stl_binary_triangle
-  {
-    float Nx;
-    float Ny;
-    float Nz;
-    float V1x;
-    float V1y;
-    float V1z;
-    float V2x;
-    float V2y;
-    float V2z;
-    float V3x;
-    float V3y;
-    float V3z;
-    short int attr_cnt;
-  };
+    // 80 byte header - content anything but "solid" (would indicated ASCII encoding)
+    for (i = 0; i < 80; i++)
+        stl_out.put('x');
 
-  struct stl_binary_triangle TRI;
+    struct stl_binary_triangle
+    {
+        float Nx;
+        float Ny;
+        float Nz;
+        float V1x;
+        float V1y;
+        float V1z;
+        float V2x;
+        float V2y;
+        float V2z;
+        float V3x;
+        float V3y;
+        float V3z;
+        short int attr_cnt;
+    };
 
-  unsigned int tri_cnt = 0;
-  fwrite((void *)&tri_cnt, 1, 4, fp); // space for number of triangles
+    struct stl_binary_triangle TRI;
+
+    stl_out.write((const char*)&tri_cnt, 4); // space for number of triangles
 
   // cube corners: upper/lower;top/botton;left/right
   typedef struct corner
@@ -177,8 +179,6 @@ int TypeBitmap::export_STL(std::string filename)
     float x, y, z;
   } corner_t;
   corner_t utl, utr, ubl, ubr, ltl, ltr, lbl, lbr;
-
-  float BH = TYPE_HEIGHT_IN * MM_PER_INCH - DOD; // Body height in mm
 
   unsigned char *buf = (unsigned char*)bitmap;
 
@@ -275,18 +275,22 @@ int TypeBitmap::export_STL(std::string filename)
   STL_triangle_write(0, -1, 0, ubl, lbr, ubr);
   STL_triangle_write(0, -1, 0, ubl, lbl, lbr);
 
-  fprintf(stdout, "tri_cnt is %d\r\n", tri_cnt);
+    std::cout << "Triangle count is " << tri_cnt << std::endl;
 
-  fseek(fp, 80, SEEK_SET);
-  fwrite((void *)&tri_cnt, 1, 4, fp);
-  fclose(fp);
+    stl_out.seekp(80);
+    stl_out.write((const char*)&tri_cnt, 4);
+    stl_out.close();
 
-  fprintf(stdout, "Wrote binary STL data to %s\r\n", filename.c_str());
-  fprintf(stdout, "---------------------\r\n");
-  fprintf(stdout, "Exported STL metrics:\r\n");
-  fprintf(stdout, "Type height   %6.4f inch  |  %6.3f mm\r\n", TYPE_HEIGHT_IN, TYPE_HEIGHT_IN*MM_PER_INCH);
-  fprintf(stdout, "Body size     %6.4f inch  |  %6.3f mm\r\n", (h*RS)/MM_PER_INCH, h*RS);
-  fprintf(stdout, "Set width     %6.4f inch  |  %6.3f mm\r\n", (w*RS)/MM_PER_INCH, w*RS);
+
+
+
+
+    std::cout << "Wrote binary STL data to" << " __" << filename << std::endl;
+    fprintf(stdout, "---------------------\r\n");
+    fprintf(stdout, "Exported STL metrics:\r\n");
+    fprintf(stdout, "Type height   %6.4f inch  |  %6.3f mm\r\n", TYPE_HEIGHT_IN, TYPE_HEIGHT_IN*MM_PER_INCH);
+    fprintf(stdout, "Body size     %6.4f inch  |  %6.3f mm\r\n", (h*RS)/MM_PER_INCH, h*RS);
+    fprintf(stdout, "Set width     %6.4f inch  |  %6.3f mm\r\n", (w*RS)/MM_PER_INCH, w*RS);
 
 
     return 0;
