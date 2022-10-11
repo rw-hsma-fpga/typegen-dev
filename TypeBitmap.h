@@ -3,13 +3,18 @@
 
 #include <cstdint>
 #include <string>
+#include "t3t_support_types.h"
 
 
 class TypeBitmap {
     bool loaded;
-    uint32_t width;
-    uint32_t height;
     uint8_t *bitmap;
+    uint32_t bm_width;
+    uint32_t bm_height;
+
+    inline void STL_triangle_write(std::ofstream &outfile, pos3d_t N,
+                                   pos3d_t v1, pos3d_t v2, pos3d_t v3,
+                                   uint32_t &count);
 
     public:
         TypeBitmap();

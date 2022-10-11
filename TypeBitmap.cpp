@@ -4,13 +4,18 @@
 #include <string>
 #include <stdio.h>
 
-TypeBitmap::TypeBitmap() : loaded(false), width(0), height(0), bitmap(NULL) {}
 
-TypeBitmap::TypeBitmap(std::string filename) : loaded(false), width(0), height(0), bitmap(NULL)
+TypeBitmap::TypeBitmap()
+            : loaded(false), bm_width(0), bm_height(0), bitmap(NULL) {}
+
+
+TypeBitmap::TypeBitmap(std::string filename)
+            : loaded(false), bm_width(0), bm_height(0), bitmap(NULL)
 {
     unload();
     load(filename);
 }
+
 
 TypeBitmap::~TypeBitmap() {
     unload();
@@ -36,7 +41,7 @@ int TypeBitmap::load(std::string filename)
     while(pbm.peek()=='#')
         getline(pbm, linebuf);
 
-    if (!(pbm >> width) || (width==0)) {
+    if (!(pbm >> bm_width) || (bm_width==0)) {
         std::cerr << "ERROR: No valid X dimension" << std::endl;
         return -1;
     }
@@ -45,12 +50,12 @@ int TypeBitmap::load(std::string filename)
     while(pbm.peek()=='#')
         getline(pbm, linebuf);
 
-    if (!(pbm >> height) || (height==0)) {
+    if (!(pbm >> bm_height) || (bm_height==0)) {
         std::cerr << "ERROR: No valid Y dimension" << std::endl;
         return -1;
     }
 
-    bitmap = (uint8_t*)calloc(size = width*height, sizeof(uint8_t));
+    bitmap = (uint8_t*)calloc(size = bm_width*bm_height, sizeof(uint8_t));
     if (bitmap == NULL) {
         std::cerr << "ERROR: Bitmap buffer allocation failed" << std::endl;
         return -1;
@@ -96,6 +101,7 @@ int TypeBitmap::load(std::string filename)
     return 0;
 }
 
+
 void TypeBitmap::unload()
 {
     if (bitmap != NULL) {
@@ -105,49 +111,17 @@ void TypeBitmap::unload()
     loaded = false;
 }
 
+
 bool TypeBitmap::is_loaded()
 {
     return loaded;
 }
 
 
-typedef struct pos3d
+inline void TypeBitmap::STL_triangle_write(std::ofstream &outfile, pos3d_t N, pos3d_t v1, pos3d_t v2, pos3d_t v3, uint32_t &count)
 {
-    float x, y, z;
-} pos3d_t;
-
-
-struct stl_binary_triangle
-{
-    float Nx;
-    float Ny;
-    float Nz;
-    float V1x;
-    float V1y;
-    float V1z;
-    float V2x;
-    float V2y;
-    float V2z;
-    float V3x;
-    float V3y;
-    float V3z;
-    short int attr_cnt;
-};
-
-
-// define for effective inlining
-//#define STL_triangle_write(N, v1, v2, v3)                                                                    \
-  ({                                                                                                         \
-    TRI = (struct stl_binary_triangle){N.x, N.y, N.z, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, 0}; \
-    stl_out.write((const char*)&TRI, 50); \
-    tri_cnt++;                                                                                               \
-  })
-
-
-inline void STL_triangle_write(std::ofstream &outfile, pos3d_t N, pos3d_t v1, pos3d_t v2, pos3d_t v3, uint32_t &count)
-{
-    struct stl_binary_triangle TRI = (struct stl_binary_triangle)
-                                     {N.x, N.y, N.z, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, 0};
+    stl_tri_t TRI = (stl_tri_t)
+                    {N.x, N.y, N.z, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, 0};
     outfile.write((const char*)&TRI, 50);
     count++;
 }
@@ -164,14 +138,11 @@ int TypeBitmap::export_STL(std::string filename)
 
     int x, y;
     int i;
-    int w = width;
-    int h = height;
+    int w = bm_width;
+    int h = bm_height;
     unsigned int tri_cnt = 0;
 
     unsigned char *buf = (unsigned char*)bitmap;
-
-    struct stl_binary_triangle TRI;
-
 
     if (filename.empty())
     {
@@ -199,8 +170,8 @@ int TypeBitmap::export_STL(std::string filename)
     // cube corners: upper/lower;top/botton;left/right
     pos3d_t utl, utr, ubl, ubr, ltl, ltr, lbl, lbr;
 
-    for (y = 0; y < height; y++) {
-        for (x = 0; x < width; x++) {
+    for (y = 0; y < bm_height; y++) {
+        for (x = 0; x < bm_width; x++) {
 
             // pixel cube corners - assuming cubes are going up from Z=0 to Z=+(depth of drive)
             utl = (pos3d_t){RS * x, -RS * y, DOD};
@@ -226,7 +197,7 @@ int TypeBitmap::export_STL(std::string filename)
                 }
 
                 // right face
-                if ((x == (width - 1)) || (buf[((y)*w) + (x + 1)] == 0)) {
+                if ((x == (bm_width - 1)) || (buf[((y)*w) + (x + 1)] == 0)) {
                     STL_triangle_write(stl_out, Xp, ubr, ltr, utr, tri_cnt);
                     STL_triangle_write(stl_out, Xp, ubr, lbr, ltr, tri_cnt);
                 }
@@ -238,7 +209,7 @@ int TypeBitmap::export_STL(std::string filename)
                 }
 
                 // bottom face
-                if ((y == (height - 1)) || (buf[((y + 1) * w) + (x)] == 0)) {
+                if ((y == (bm_height - 1)) || (buf[((y + 1) * w) + (x)] == 0)) {
                     STL_triangle_write(stl_out, Yn, ubl, lbr, ubr, tri_cnt);
                     STL_triangle_write(stl_out, Yn, ubl, lbl, lbr, tri_cnt);
                 }
@@ -251,7 +222,7 @@ int TypeBitmap::export_STL(std::string filename)
         }
     }
 
-    // lower type cupe corners - assuming cube goes down from Z=0 to Z=-(type height - depth of drive)
+    // lower type cube corners - assuming cube goes down from Z=0 to Z=-(type height - depth of drive)
 
     utl = (pos3d_t){0, 0, 0};
     utr = (pos3d_t){RS * w, 0, 0};
@@ -290,7 +261,7 @@ int TypeBitmap::export_STL(std::string filename)
     stl_out.close();
 
 
-    std::cout << "Wrote binary STL data to" << filename << std::endl;
+    std::cout << "Wrote binary STL data to " << filename << std::endl;
     fprintf(stdout, "---------------------\r\n");
     fprintf(stdout, "Exported STL metrics:\r\n");
     fprintf(stdout, "Type height   %6.4f inch  |  %6.3f mm\r\n", TYPE_HEIGHT_IN, TYPE_HEIGHT_IN*MM_PER_INCH);
