@@ -13,14 +13,11 @@ class dim_t {
                  // 0 is also the same in any unit
     dim_unit_t unit;
 
-    const float MM_PER_INCH = 25.4;
-    const float INCH_PER_PT = 0.013835; // per type history; 72pt=0.99612"
-    // const float INCH_PER_PT = 0.013888; // as 1/72th of an inch
-
     public:
     dim_t();
     dim_t(float v, dim_unit_t u);
     dim_t(float v, std::string ustr);
+    //dim_t& dim_t::operator=(const dim_t&);
     int set(float v, dim_unit_t u);
     int set(float v, std::string ustr);
     float as_mm();

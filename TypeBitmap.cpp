@@ -2,7 +2,8 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <stdio.h>
+#include <boost/format.hpp> 
+
 
 
 TypeBitmap::TypeBitmap()
@@ -118,6 +119,16 @@ bool TypeBitmap::is_loaded()
 }
 
 
+int TypeBitmap::set_type_parameters(dim_t TH, dim_t DOD, dim_t RS, dim_t LH)
+{
+    type_height = TH;
+    depth_of_drive = DOD;
+    raster_size = RS;
+    layer_height = LH;
+    return 0;
+}
+
+
 inline void TypeBitmap::STL_triangle_write(std::ofstream &outfile, pos3d_t N, pos3d_t v1, pos3d_t v2, pos3d_t v3, uint32_t &count)
 {
     stl_tri_t TRI = (stl_tri_t)
@@ -129,12 +140,11 @@ inline void TypeBitmap::STL_triangle_write(std::ofstream &outfile, pos3d_t N, po
 
 int TypeBitmap::export_STL(std::string filename)
 {
-    const float TYPE_HEIGHT_IN = 0.918;
-    const float MM_PER_INCH = 25.4;
-    const float RS = 0.0285; // raster size in mm (28,5um)
-    const float DOD = 1.6;   // Depth of drive in mm
-
-    float BH = TYPE_HEIGHT_IN * MM_PER_INCH - DOD; // Body height in mm
+    //const float TYPE_HEIGHT_IN = 0.918;
+    //const float MM_PER_INCH = 25.4;
+    float RS = raster_size.as_mm();
+    float DOD = depth_of_drive.as_mm();
+    float BH = type_height.as_mm() - DOD; // Body height in mm
 
     int x, y;
     int i;
@@ -260,14 +270,15 @@ int TypeBitmap::export_STL(std::string filename)
     stl_out.write((const char*)&tri_cnt, 4);
     stl_out.close();
 
-
     std::cout << "Wrote binary STL data to " << filename << std::endl;
-    fprintf(stdout, "---------------------\r\n");
-    fprintf(stdout, "Exported STL metrics:\r\n");
-    fprintf(stdout, "Type height   %6.4f inch  |  %6.3f mm\r\n", TYPE_HEIGHT_IN, TYPE_HEIGHT_IN*MM_PER_INCH);
-    fprintf(stdout, "Body size     %6.4f inch  |  %6.3f mm\r\n", (h*RS)/MM_PER_INCH, h*RS);
-    fprintf(stdout, "Set width     %6.4f inch  |  %6.3f mm\r\n", (w*RS)/MM_PER_INCH, w*RS);
-
+    std::cout << "---------------------" << std::endl;
+    std::cout << "Exported STL metrics:" << std::endl;
+    std::cout << "Type height   " << boost::format("%6.4f") % type_height.as_inch()
+              << " inch  |  "  << boost::format("%6.3f") %  type_height.as_mm() << " mm" << std::endl;
+    std::cout << "Body size     " << boost::format("%6.4f") % (h*raster_size.as_inch())
+              << " inch  |  "  << boost::format("%6.3f") %  (h*raster_size.as_mm()) << " mm" << std::endl;
+    std::cout << "Set width     " << boost::format("%6.4f") % (w*raster_size.as_inch())
+              << " inch  |  "  << boost::format("%6.3f") %  (w*raster_size.as_mm()) << " mm" << std::endl;
 
     return 0;
 }

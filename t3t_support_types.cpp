@@ -1,6 +1,10 @@
 #include "t3t_support_types.h"
 
 
+static const float MM_PER_INCH = 25.4;
+static const float INCH_PER_PT = 0.013835; // per type history; 72pt=0.99612"
+// const float INCH_PER_PT = 0.013888; // as 1/72th of an inch
+
 dim_t::dim_t()
 {
     set(0, "mm");
@@ -28,7 +32,6 @@ int dim_t::set(float v, dim_unit_t u)
     value = 0;
     return -1;
 }
-
 
 int dim_t::set(float v, std::string ustr)
 {
