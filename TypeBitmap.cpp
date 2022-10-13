@@ -154,9 +154,15 @@ int TypeBitmap::export_STL(std::string filename)
 
     unsigned char *buf = (unsigned char*)bitmap;
 
+    if (!loaded)
+    {
+        std::cerr << "ERROR: No Bitmap loaded." << std::endl;
+        return -1;
+    }
+
     if (filename.empty())
     {
-        std::cerr << "No STL file specified." << std::endl;
+        std::cerr << "ERROR: No STL file specified." << std::endl;
         return -1;
     }
 
