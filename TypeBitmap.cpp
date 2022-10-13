@@ -119,12 +119,13 @@ bool TypeBitmap::is_loaded()
 }
 
 
-int TypeBitmap::set_type_parameters(dim_t TH, dim_t DOD, dim_t RS, dim_t LH)
+int TypeBitmap::set_type_parameters(dim_t TH, dim_t DOD, dim_t RS, dim_t LH, dim_t BFD)
 {
     type_height = TH;
     depth_of_drive = DOD;
     raster_size = RS;
     layer_height = LH;
+    beveled_foot_depth = BFD;
     return 0;
 }
 
@@ -140,11 +141,10 @@ inline void TypeBitmap::STL_triangle_write(std::ofstream &outfile, pos3d_t N, po
 
 int TypeBitmap::export_STL(std::string filename)
 {
-    //const float TYPE_HEIGHT_IN = 0.918;
-    //const float MM_PER_INCH = 25.4;
     float RS = raster_size.as_mm();
     float DOD = depth_of_drive.as_mm();
     float BH = type_height.as_mm() - DOD; // Body height in mm
+    float BFD = beveled_foot_depth.as_mm();
 
     int x, y;
     int i;
@@ -239,14 +239,10 @@ int TypeBitmap::export_STL(std::string filename)
     ubl = (pos3d_t){0, -RS * h, 0};
     ubr = (pos3d_t){RS * w, -RS * h, 0};
 
-    ltl = (pos3d_t){0, 0, -BH};
-    ltr = (pos3d_t){RS * w, 0, -BH};
-    lbl = (pos3d_t){0, -RS * h, -BH};
-    lbr = (pos3d_t){RS * w, -RS * h, -BH};
-
-    // lower face
-    STL_triangle_write(stl_out, Zn, ltr, lbl, ltl, tri_cnt);
-    STL_triangle_write(stl_out, Zn, ltr, lbr, lbl, tri_cnt);
+    ltl = (pos3d_t){0, 0, -(BH-BFD)};
+    ltr = (pos3d_t){RS * w, 0, -(BH-BFD)};
+    lbl = (pos3d_t){0, -RS * h, -(BH-BFD)};
+    lbr = (pos3d_t){RS * w, -RS * h, -(BH-BFD)};
 
     // left face
     STL_triangle_write(stl_out, Xn, ubl, utl, ltl, tri_cnt);
@@ -263,6 +259,49 @@ int TypeBitmap::export_STL(std::string filename)
     // bottom face
     STL_triangle_write(stl_out, Yn, ubl, lbr, ubr, tri_cnt);
     STL_triangle_write(stl_out, Yn, ubl, lbl, lbr, tri_cnt);
+
+    // lower face - no beveled foot
+    if (BFD == 0) {
+        STL_triangle_write(stl_out, Zn, ltr, lbl, ltl, tri_cnt);
+        STL_triangle_write(stl_out, Zn, ltr, lbr, lbl, tri_cnt);
+    }
+    else { // beveled foot
+        utl = (pos3d_t){0, 0, -(BH-BFD)};
+        utr = (pos3d_t){RS * w, 0, -(BH-BFD)};
+        ubl = (pos3d_t){0, -RS * h, -(BH-BFD)};
+        ubr = (pos3d_t){RS * w, -RS * h, -(BH-BFD)};
+
+        ltl = (pos3d_t){BFD, -BFD, -BH};
+        ltr = (pos3d_t){RS*w - BFD, -BFD, -BH};
+        lbl = (pos3d_t){BFD, -RS*h + BFD, -BH};
+        lbr = (pos3d_t){RS*w - BFD, -RS*h + BFD, -BH};
+
+        // normal vectors: - 45 degrees downwards
+        pos3d_t LD = (pos3d_t){-1,  0, -1};
+        pos3d_t RD = (pos3d_t){ 1,  0, -1};
+        pos3d_t TD = (pos3d_t){ 0,  1, -1};
+        pos3d_t BD = (pos3d_t){ 0, -1, -1};
+
+        // left face
+        STL_triangle_write(stl_out, LD, ubl, utl, ltl, tri_cnt);
+        STL_triangle_write(stl_out, LD, ubl, ltl, lbl, tri_cnt);
+
+        // right face
+        STL_triangle_write(stl_out, RD, ubr, ltr, utr, tri_cnt);
+        STL_triangle_write(stl_out, RD, ubr, lbr, ltr, tri_cnt);
+
+        // top face
+        STL_triangle_write(stl_out, TD, utl, utr, ltr, tri_cnt);
+        STL_triangle_write(stl_out, TD, utl, ltr, ltl, tri_cnt);
+
+        // bottom face
+        STL_triangle_write(stl_out, BD, ubl, lbr, ubr, tri_cnt);
+        STL_triangle_write(stl_out, BD, ubl, lbl, lbr, tri_cnt);
+
+        // lower face
+        STL_triangle_write(stl_out, Zn, ltr, lbl, ltl, tri_cnt);
+        STL_triangle_write(stl_out, Zn, ltr, lbr, lbl, tri_cnt);
+    }
 
     std::cout << "Triangle count is " << tri_cnt << std::endl;
 

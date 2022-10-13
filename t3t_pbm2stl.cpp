@@ -8,11 +8,11 @@ using namespace std;
 struct {
     dim_t type_height; 
     dim_t depth_of_drive;
-    bool reduced_bottom_area;
-        dim_t rda;
+    bool beveled_foot;
     dim_t raster_size;
     dim_t layer_height;
-} argsopts = { .reduced_bottom_area = false };
+    dim_t beveled_foot_depth;
+} argsopts = { .beveled_foot = false };
 
 int get_yaml_dim_node(YAML::Node &parent, std::string name, dim_t &target);
 
@@ -25,16 +25,18 @@ int main()
     get_yaml_dim_node(config, "depth of drive", argsopts.depth_of_drive);
     get_yaml_dim_node(config, "raster size", argsopts.raster_size);
     get_yaml_dim_node(config, "layer height", argsopts.layer_height);
-
+    get_yaml_dim_node(config, "beveled foot depth", argsopts.beveled_foot_depth);
 
     string bitmap_file = "E0.pbm";
-    string stl_file = "E0.stl";
+    string stl_file = "E2.stl";
+
 
     TypeBitmap *TBM = new TypeBitmap();
     TBM->set_type_parameters(argsopts.type_height,
                              argsopts.depth_of_drive,
                              argsopts.raster_size,
-                             argsopts.layer_height);
+                             argsopts.layer_height,
+                             argsopts.beveled_foot_depth);
 
     TBM->load(bitmap_file);
     TBM->export_STL(stl_file);
