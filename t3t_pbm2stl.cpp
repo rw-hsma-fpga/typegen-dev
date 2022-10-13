@@ -2,8 +2,10 @@
 #include "TypeBitmap.h"
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 #include <boost/format.hpp> 
 #include <boost/program_options.hpp> 
+#include <sstream>
 
 using namespace std;
 namespace bpo = boost::program_options;
@@ -16,7 +18,7 @@ struct {
     dim_t raster_size;
     dim_t layer_height;
     dim_t beveled_foot_depth;
-    std::string yaml_path;
+    //std::string yaml_path;
     std::string pbm_path;
     std::string stl_path;
 } argsopts;// = { .beveled_foot = false };
@@ -57,24 +59,39 @@ int get_yaml_dim_node(YAML::Node &parent, std::string name, dim_t &target)
 
 int parse_options(int ac, char* av[])
 {
+    std::vector<std::string> yaml_paths;
+
     try {
 
         bpo::options_description desc("t3t_pbm2stl: Command-line options and arguments");
         desc.add_options()
             ("help", "produce this help message")
-            ("yaml,y", bpo::value<std::string>(&argsopts.yaml_path)->default_value("config.yaml"),
-                    "specify YAML configuration file")
             ("pbm,p", bpo::value<std::string>(&argsopts.pbm_path), "specify input PBM path")
             ("stl,s", bpo::value<std::string>(&argsopts.stl_path), "specify output STL path")
+            ("yaml,y", bpo::value< vector<string> >(&yaml_paths), "specify YAML configuration file(s)")
         ;
 
         bpo::variables_map vm;        
-        bpo::store(bpo::parse_command_line(ac, av, desc), vm);
-        bpo::notify(vm);    
 
-        if (!argsopts.yaml_path.empty() && !argsopts.yaml_path.ends_with(".yaml"))
-            argsopts.yaml_path.append(".yaml");
-        cout << string(argsopts.yaml_path) << endl;
+        bpo::positional_options_description posopt;
+        posopt.add("yaml", -1);
+        bpo::store(bpo::command_line_parser(ac, av).
+          options(desc).positional(posopt).run(), vm);
+        bpo::notify(vm);
+
+        if (vm.count("help")) {
+            cout << desc << "\n";
+            return 0;
+        }
+
+        for (string& s: yaml_paths) {
+            if (!s.empty() && !s.ends_with(".yaml"))
+                s.append(".yaml");
+            cout << string(s) << endl;
+        }
+
+        if (yaml_paths.empty() && std::filesystem::exists("config.yaml"))
+            yaml_paths.push_back("config.yaml");
 
         if (!argsopts.pbm_path.empty() && !argsopts.pbm_path.ends_with(".pbm"))
             argsopts.pbm_path.append(".pbm");
@@ -84,19 +101,33 @@ int parse_options(int ac, char* av[])
             argsopts.stl_path.append(".stl");
         cout << string(argsopts.stl_path) << endl;
 
-        if (vm.count("help")) {
-            cout << desc << "\n";
-            return 0;
+        string yaml_config;
+
+        for (string& s: yaml_paths) {
+            if (filesystem::exists(s)) {
+                    ifstream yfile(s);
+                    while(!yfile.eof()) {
+                        string buf;
+                        getline(yfile, buf);
+                        yaml_config += buf;
+                        yaml_config += "\n";
+                    }
+                    yaml_config += "\n";
+            }
         }
+                 // TODO: Commandline arg
 
+        YAML::Node config = YAML::Load(yaml_config);
 
-        YAML::Node config = YAML::LoadFile(argsopts.yaml_path); // TODO: Commandline arg
+        std::ofstream fout("outtest.yaml");
+        fout << config;
 
         get_yaml_dim_node(config, "type height", argsopts.type_height);
         get_yaml_dim_node(config, "depth of drive", argsopts.depth_of_drive);
         get_yaml_dim_node(config, "raster size", argsopts.raster_size);
         get_yaml_dim_node(config, "layer height", argsopts.layer_height);
         get_yaml_dim_node(config, "beveled foot depth", argsopts.beveled_foot_depth);
+
 
 /*
         if (vm.count("compression")) {

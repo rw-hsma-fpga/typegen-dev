@@ -1,0 +1,18 @@
+# type properties
+type height:
+  value: 0.918
+  unit: inch
+
+depth of drive:
+  value: 1.6
+  unit: mm
+
+#STL options:
+#  - option: beveled foot
+
+beveled foot depth:
+  value: 1.5
+  unit: mm
+
+
+

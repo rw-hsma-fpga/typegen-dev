@@ -3,5 +3,6 @@
 !*.cpp
 !*.h
 !*.sh
+!*.yaml
 !.gitignore
 
