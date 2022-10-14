@@ -10,9 +10,13 @@ depth of drive:
 #STL options:
 #  - option: beveled foot
 
-beveled foot depth:
-  value: 1.5
+reduced foot XY:
+  value: 2
   unit: mm
 
+reduced foot Z:
+  value: 4
+  unit: mm
 
+reduced foot mode: step
 

@@ -5,6 +5,7 @@
 #include <string>
 #include "t3t_support_types.h"
 
+enum reduced_foot_mode {none, bevel, step};
 
 class TypeBitmap {
     bool loaded;
@@ -15,9 +16,8 @@ class TypeBitmap {
     dim_t type_height;
     dim_t depth_of_drive;
     dim_t raster_size;
-    dim_t layer_height;
-
-    dim_t beveled_foot_depth;
+    dim_t layer_height; // not really required here
+    // TODO: Fudge factor Z?
 
     inline void STL_triangle_write(std::ofstream &outfile, pos3d_t N,
                                    pos3d_t v1, pos3d_t v2, pos3d_t v3,
@@ -32,9 +32,9 @@ class TypeBitmap {
         void unload();
         bool is_loaded();
 
-        int set_type_parameters(dim_t TH, dim_t DOD, dim_t RS, dim_t LH, dim_t BFD);
+        int set_type_parameters(dim_t TH, dim_t DOD, dim_t RS, dim_t LH);
 
-        int export_STL(std::string filename);
+        int export_STL(std::string filename, reduced_foot_mode foot_mode, dim_t footXY, dim_t footZ);
 };
 
 #endif // TYPEBITMAP_H

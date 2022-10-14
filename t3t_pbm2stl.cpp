@@ -14,14 +14,18 @@ namespace bpo = boost::program_options;
 struct {
     dim_t type_height; 
     dim_t depth_of_drive;
-    //bool beveled_foot;
+
     dim_t raster_size;
     dim_t layer_height;
-    dim_t beveled_foot_depth;
-    //std::string yaml_path;
+
+    reduced_foot_mode foot_mode;
+    dim_t reduced_foot_XY;
+    dim_t reduced_foot_Z;
+
     std::string pbm_path;
     std::string stl_path;
-} argsopts;// = { .beveled_foot = false };
+
+} argsopts = { .foot_mode = none };
 
 
 int parse_options(int ac, char* av[]);
@@ -36,12 +40,12 @@ int main(int ac, char* av[])
     TBM->set_type_parameters(argsopts.type_height,
                              argsopts.depth_of_drive,
                              argsopts.raster_size,
-                             argsopts.layer_height,
-                             argsopts.beveled_foot_depth);
+                             argsopts.layer_height);
 
     TBM->load(argsopts.pbm_path);
-    TBM->export_STL(argsopts.stl_path);
-
+    TBM->export_STL(argsopts.stl_path, argsopts.foot_mode,
+                    argsopts.reduced_foot_XY, argsopts.reduced_foot_Z);
+                                        // TODO
     return 0;
 }
 
@@ -87,7 +91,6 @@ int parse_options(int ac, char* av[])
         for (string& s: yaml_paths) {
             if (!s.empty() && !s.ends_with(".yaml"))
                 s.append(".yaml");
-            cout << string(s) << endl;
         }
 
         if (yaml_paths.empty() && std::filesystem::exists("config.yaml"))
@@ -95,11 +98,9 @@ int parse_options(int ac, char* av[])
 
         if (!argsopts.pbm_path.empty() && !argsopts.pbm_path.ends_with(".pbm"))
             argsopts.pbm_path.append(".pbm");
-        cout << string(argsopts.pbm_path) << endl;
 
         if (!argsopts.stl_path.empty() && !argsopts.stl_path.ends_with(".stl"))
             argsopts.stl_path.append(".stl");
-        cout << string(argsopts.stl_path) << endl;
 
         string yaml_config;
 
@@ -119,24 +120,23 @@ int parse_options(int ac, char* av[])
 
         YAML::Node config = YAML::Load(yaml_config);
 
-        std::ofstream fout("outtest.yaml");
-        fout << config;
-
         get_yaml_dim_node(config, "type height", argsopts.type_height);
         get_yaml_dim_node(config, "depth of drive", argsopts.depth_of_drive);
         get_yaml_dim_node(config, "raster size", argsopts.raster_size);
         get_yaml_dim_node(config, "layer height", argsopts.layer_height);
-        get_yaml_dim_node(config, "beveled foot depth", argsopts.beveled_foot_depth);
+        get_yaml_dim_node(config, "reduced foot XY", argsopts.reduced_foot_XY);
+        get_yaml_dim_node(config, "reduced foot Z", argsopts.reduced_foot_Z);
 
-
-/*
-        if (vm.count("compression")) {
-            cout << "Compression level was set to " 
-                 << vm["compression"].as<double>() << ".\n";
-        } else {
-            cout << "Compression level was not set.\n";
+        if (config["reduced foot mode"]) {
+            string foot_mode_str = config["reduced foot mode"].as<std::string>();
+            if (foot_mode_str=="bevel")
+                argsopts.foot_mode = bevel;
+            else if (foot_mode_str=="step")
+                argsopts.foot_mode = step;
+            else
+                argsopts.foot_mode = none;
         }
-        */
+
     }
     catch(exception& e) {
         cerr << "error: " << e.what() << "\n";

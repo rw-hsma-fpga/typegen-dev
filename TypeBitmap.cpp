@@ -119,13 +119,13 @@ bool TypeBitmap::is_loaded()
 }
 
 
-int TypeBitmap::set_type_parameters(dim_t TH, dim_t DOD, dim_t RS, dim_t LH, dim_t BFD)
+int TypeBitmap::set_type_parameters(dim_t TH, dim_t DOD, dim_t RS, dim_t LH)
 {
     type_height = TH;
     depth_of_drive = DOD;
     raster_size = RS;
     layer_height = LH;
-    beveled_foot_depth = BFD;
+
     return 0;
 }
 
@@ -139,13 +139,8 @@ inline void TypeBitmap::STL_triangle_write(std::ofstream &outfile, pos3d_t N, po
 }
 
 
-int TypeBitmap::export_STL(std::string filename)
+int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, dim_t footXY, dim_t footZ)
 {
-    float RS = raster_size.as_mm();
-    float DOD = depth_of_drive.as_mm();
-    float BH = type_height.as_mm() - DOD; // Body height in mm
-    float BFD = beveled_foot_depth.as_mm();
-
     int x, y;
     int i;
     int w = bm_width;
@@ -153,6 +148,23 @@ int TypeBitmap::export_STL(std::string filename)
     unsigned int tri_cnt = 0;
 
     unsigned char *buf = (unsigned char*)bitmap;
+
+    float RS = raster_size.as_mm();
+    float DOD = depth_of_drive.as_mm();
+    float BH = type_height.as_mm() - DOD; // Body height in mm
+
+    float FZ;
+    float FXY;
+
+    if (foot_mode == none) {
+        FZ = 0;
+        FXY = 0;
+    }
+    else {
+        FZ = footZ.as_mm();
+        FXY = footXY.as_mm();
+    }
+
 
     if (!loaded)
     {
@@ -182,6 +194,12 @@ int TypeBitmap::export_STL(std::string filename)
     pos3d_t Xp = (pos3d_t){ 1,  0,  0};  pos3d_t Xn = (pos3d_t){-1,  0,  0};
     pos3d_t Yp = (pos3d_t){ 0,  1,  0};  pos3d_t Yn = (pos3d_t){ 0, -1,  0};
     pos3d_t Zp = (pos3d_t){ 0,  0,  1};  pos3d_t Zn = (pos3d_t){ 0,  0, -1};
+
+    // normal vectors: - 45 degrees downwards
+    pos3d_t LD = (pos3d_t){-1,  0, -1}; // left down
+    pos3d_t RD = (pos3d_t){ 1,  0, -1}; // right down
+    pos3d_t TD = (pos3d_t){ 0,  1, -1}; // top down
+    pos3d_t BD = (pos3d_t){ 0, -1, -1}; // bottom down
 
     // cube corners: upper/lower;top/botton;left/right
     pos3d_t utl, utr, ubl, ubr, ltl, ltr, lbl, lbr;
@@ -231,24 +249,24 @@ int TypeBitmap::export_STL(std::string filename)
                 }
             }
             else {
-                // upper faces for 0s (body)
+                // lower faces become upper faces of body for 0
                 STL_triangle_write(stl_out, Zp, ltr, lbl, ltl, tri_cnt);
                 STL_triangle_write(stl_out, Zp, ltr, lbr, lbl, tri_cnt);
             }
         }
     }
 
-    // lower type cube corners - assuming cube goes down from Z=0 to Z=-(type height - depth of drive)
+    // type body cube corners - assuming cube goes down from Z=0 to Z=-(type height - depth of drive)
 
     utl = (pos3d_t){0, 0, 0};
     utr = (pos3d_t){RS * w, 0, 0};
     ubl = (pos3d_t){0, -RS * h, 0};
     ubr = (pos3d_t){RS * w, -RS * h, 0};
 
-    ltl = (pos3d_t){0, 0, -(BH-BFD)};
-    ltr = (pos3d_t){RS * w, 0, -(BH-BFD)};
-    lbl = (pos3d_t){0, -RS * h, -(BH-BFD)};
-    lbr = (pos3d_t){RS * w, -RS * h, -(BH-BFD)};
+    ltl = (pos3d_t){0, 0, -(BH-FZ)};
+    ltr = (pos3d_t){RS * w, 0, -(BH-FZ)};
+    lbl = (pos3d_t){0, -RS * h, -(BH-FZ)};
+    lbr = (pos3d_t){RS * w, -RS * h, -(BH-FZ)};
 
     // left face
     STL_triangle_write(stl_out, Xn, ubl, utl, ltl, tri_cnt);
@@ -266,27 +284,44 @@ int TypeBitmap::export_STL(std::string filename)
     STL_triangle_write(stl_out, Yn, ubl, lbr, ubr, tri_cnt);
     STL_triangle_write(stl_out, Yn, ubl, lbl, lbr, tri_cnt);
 
-    // lower face - no beveled foot
-    if (BFD == 0) {
-        STL_triangle_write(stl_out, Zn, ltr, lbl, ltl, tri_cnt);
-        STL_triangle_write(stl_out, Zn, ltr, lbr, lbl, tri_cnt);
+
+    // lower(lowest) face - bevel/step foot
+    if ((foot_mode == step) || (foot_mode == bevel)) {
+        ltl = (pos3d_t){FXY, -FXY, -BH};
+        ltr = (pos3d_t){RS*w - FXY, -FXY, -BH};
+        lbl = (pos3d_t){FXY, -RS*h + FXY, -BH};
+        lbr = (pos3d_t){RS*w - FXY, -RS*h + FXY, -BH};
     }
-    else { // beveled foot
-        utl = (pos3d_t){0, 0, -(BH-BFD)};
-        utr = (pos3d_t){RS * w, 0, -(BH-BFD)};
-        ubl = (pos3d_t){0, -RS * h, -(BH-BFD)};
-        ubr = (pos3d_t){RS * w, -RS * h, -(BH-BFD)};
 
-        ltl = (pos3d_t){BFD, -BFD, -BH};
-        ltr = (pos3d_t){RS*w - BFD, -BFD, -BH};
-        lbl = (pos3d_t){BFD, -RS*h + BFD, -BH};
-        lbr = (pos3d_t){RS*w - BFD, -RS*h + BFD, -BH};
+    if (foot_mode == step) { // stepped foot
+        utl = (pos3d_t){FXY, -FXY, -(BH-FZ)};
+        utr = (pos3d_t){RS*w - FXY, -FXY, -(BH-FZ)};
+        ubl = (pos3d_t){FXY, -RS*h + FXY, -(BH-FZ)};
+        ubr = (pos3d_t){RS*w - FXY, -RS*h + FXY, -(BH-FZ)};
 
-        // normal vectors: - 45 degrees downwards
-        pos3d_t LD = (pos3d_t){-1,  0, -1};
-        pos3d_t RD = (pos3d_t){ 1,  0, -1};
-        pos3d_t TD = (pos3d_t){ 0,  1, -1};
-        pos3d_t BD = (pos3d_t){ 0, -1, -1};
+        // left face
+        STL_triangle_write(stl_out, Xn, ubl, utl, ltl, tri_cnt);
+        STL_triangle_write(stl_out, Xn, ubl, ltl, lbl, tri_cnt);
+
+        // right face
+        STL_triangle_write(stl_out, Xp, ubr, ltr, utr, tri_cnt);
+        STL_triangle_write(stl_out, Xp, ubr, lbr, ltr, tri_cnt);
+
+        // top face
+        STL_triangle_write(stl_out, Yp, utl, utr, ltr, tri_cnt);
+        STL_triangle_write(stl_out, Yp, utl, ltr, ltl, tri_cnt);
+
+        // bottom face
+        STL_triangle_write(stl_out, Yn, ubl, lbr, ubr, tri_cnt);
+        STL_triangle_write(stl_out, Yn, ubl, lbl, lbr, tri_cnt);
+
+    }
+
+    if (foot_mode == bevel) { // beveled foot
+        utl = (pos3d_t){0, 0, -(BH-FZ)};
+        utr = (pos3d_t){RS * w, 0, -(BH-FZ)};
+        ubl = (pos3d_t){0, -RS * h, -(BH-FZ)};
+        ubr = (pos3d_t){RS * w, -RS * h, -(BH-FZ)};
 
         // left face
         STL_triangle_write(stl_out, LD, ubl, utl, ltl, tri_cnt);
@@ -304,10 +339,51 @@ int TypeBitmap::export_STL(std::string filename)
         STL_triangle_write(stl_out, BD, ubl, lbr, ubr, tri_cnt);
         STL_triangle_write(stl_out, BD, ubl, lbl, lbr, tri_cnt);
 
-        // lower face
-        STL_triangle_write(stl_out, Zn, ltr, lbl, ltl, tri_cnt);
-        STL_triangle_write(stl_out, Zn, ltr, lbr, lbl, tri_cnt);
     }
+
+    // bevel/step foot
+    if ((foot_mode == step) || (foot_mode == bevel)) {
+        ltl = (pos3d_t){FXY, -FXY, -BH};
+        ltr = (pos3d_t){RS*w - FXY, -FXY, -BH};
+        lbl = (pos3d_t){FXY, -RS*h + FXY, -BH};
+        lbr = (pos3d_t){RS*w - FXY, -RS*h + FXY, -BH};
+    }
+
+    // lower face - prepared XY coordinates differ between foot_mode "none" and "bevel/step"
+    STL_triangle_write(stl_out, Zn, ltr, lbl, ltl, tri_cnt);
+    STL_triangle_write(stl_out, Zn, ltr, lbr, lbl, tri_cnt);
+
+    if (foot_mode == step) { // stepped foot
+        // downlooking faces around step rim
+
+        utl = (pos3d_t){0, 0, -(BH-FZ)};
+        utr = (pos3d_t){RS * w, 0, -(BH-FZ)};
+        ubl = (pos3d_t){0, -RS * h, -(BH-FZ)};
+        ubr = (pos3d_t){RS * w, -RS * h, -(BH-FZ)};
+
+
+        ltl = (pos3d_t){FXY, -FXY, -(BH-FZ)};
+        ltr = (pos3d_t){RS*w - FXY, -FXY, -(BH-FZ)};
+        lbl = (pos3d_t){FXY, -RS*h + FXY, -(BH-FZ)};
+        lbr = (pos3d_t){RS*w - FXY, -RS*h + FXY, -(BH-FZ)};
+
+        // left downward face
+        STL_triangle_write(stl_out, Zn, ubl, utl, ltl, tri_cnt);
+        STL_triangle_write(stl_out, Zn, ubl, ltl, lbl, tri_cnt);
+
+        // right downward face
+        STL_triangle_write(stl_out, Zn, ubr, ltr, utr, tri_cnt);
+        STL_triangle_write(stl_out, Zn, ubr, lbr, ltr, tri_cnt);
+
+        // top downward face
+        STL_triangle_write(stl_out, Zn, utl, utr, ltr, tri_cnt);
+        STL_triangle_write(stl_out, Zn, utl, ltr, ltl, tri_cnt);
+
+        // bottom downward face
+        STL_triangle_write(stl_out, Zn, ubl, lbr, ubr, tri_cnt);
+        STL_triangle_write(stl_out, Zn, ubl, lbl, lbr, tri_cnt);
+    }
+
 
     std::cout << "Triangle count is " << tri_cnt << std::endl;
 
