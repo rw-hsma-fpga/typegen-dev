@@ -26,11 +26,18 @@ class TypeBitmap {
     public:
         TypeBitmap();
         TypeBitmap(std::string filename);
+        TypeBitmap(uint32_t width, uint32_t height);
         ~TypeBitmap();
 
-        int load(std::string filename);
         void unload();
+        int load(std::string filename);
         bool is_loaded();
+
+        int store(std::string filename);
+        int newBitmap(uint32_t width, uint32_t height);
+        int pasteGlyph(uint8_t *glyph, uint32_t g_width, uint32_t g_height, uint32_t top_pos, uint32_t left_pos);
+        void threshold(uint8_t thr);
+        void mirror();
 
         int set_type_parameters(dim_t TH, dim_t DOD, dim_t RS, dim_t LH);
 

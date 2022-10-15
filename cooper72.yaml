@@ -5,5 +5,10 @@ body size:
   value: 72
   unit: pt
 
+character: E
+
+# without U= for now
+#unicode: 0x45
+
 
 # font scaling mode and parameters
