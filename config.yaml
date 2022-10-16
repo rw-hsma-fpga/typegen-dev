@@ -11,12 +11,12 @@ depth of drive:
 #  - option: beveled foot
 
 reduced foot XY:
-  value: 2
+  value: 1.5
   unit: mm
 
 reduced foot Z:
-  value: 4
+  value: 1.5
   unit: mm
 
-reduced foot mode: step
+reduced foot mode: bevel
 

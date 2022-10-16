@@ -29,16 +29,15 @@ struct {
     dim_t body_size;
     std::string font_path;
     std::string pbm_path;
-    std::string character;
     std::vector<uint32_t> characters;
-    int unicode;
 
     std::string ref_char;
     dim_t above_ref_char;
     dim_t below_ref_char;
 
+    float XYshrink_pct;
 
-} argsopts = { .unicode = 0 };
+} argsopts = { .XYshrink_pct = 0 };
 
 
 int parse_options(int ac, char* av[]);
@@ -48,6 +47,9 @@ int get_yaml_dim_node(YAML::Node &parent, std::string name, dim_t &target);
 int main(int ac, char* av[])
 {
     parse_options(ac, av);
+
+    float UVstretchXY = (float)100 / ((float)100 + argsopts.XYshrink_pct);
+    cout << "XY stretch to compensate UV shrinking: " << UVstretchXY << endl;
 
     FT_Library library;
     FT_Face face;
@@ -114,7 +116,7 @@ int main(int ac, char* av[])
     slot = face->glyph;
 
 
-    for(int i; i<argsopts.characters.size(); i++) {
+    for(int i=0; i<argsopts.characters.size(); i++) {
 
         uint32_t current_char = argsopts.characters[i];
         error = FT_Load_Char(face, current_char, FT_LOAD_RENDER);
@@ -251,6 +253,10 @@ int parse_options(int ac, char* av[])
         if (config["unicode"]) {
             for(int i=0; i<  config["unicode"].size(); i++)
                 argsopts.characters.push_back((uint32_t)config["unicode"][i].as<int>());
+        }
+
+        if (config["XYshrink_pct"]) {
+            argsopts.XYshrink_pct = config["XYshrink_pct"].as<float>();
         }
 
     }

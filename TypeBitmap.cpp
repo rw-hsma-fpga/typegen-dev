@@ -283,7 +283,7 @@ inline void TypeBitmap::STL_triangle_write(std::ofstream &outfile, pos3d_t N, po
 }
 
 
-int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, dim_t footXY, dim_t footZ)
+int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, dim_t footXY, dim_t footZ, float UVstretchZ)
 {
     int x, y;
     int i;
@@ -294,8 +294,8 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
     unsigned char *buf = (unsigned char*)bitmap;
 
     float RS = raster_size.as_mm();
-    float DOD = depth_of_drive.as_mm();
-    float BH = type_height.as_mm() - DOD; // Body height in mm
+    float DOD = UVstretchZ*depth_of_drive.as_mm();
+    float BH = UVstretchZ*(type_height.as_mm()) - DOD; // Body height in mm
 
     float FZ;
     float FXY;
@@ -305,7 +305,7 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
         FXY = 0;
     }
     else {
-        FZ = footZ.as_mm();
+        FZ = footZ.as_mm() * UVstretchZ;
         FXY = footXY.as_mm();
     }
 
