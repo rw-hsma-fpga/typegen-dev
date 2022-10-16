@@ -11,26 +11,18 @@ namespace bpo = boost::program_options;
 
 
 extern "C" {
-    #include <ctype.h>
-    #include <stdio.h>
-    #include <stdlib.h>
-    #include <unistd.h>
-    #include <string.h>
-    #include <math.h>
-    #include <malloc.h>
-    #include <argp.h>
-#include <ft2build.h>
-#include FT_FREETYPE_H
+    #include <ft2build.h>
+    #include FT_FREETYPE_H
 }
+
+inline float i26_6_to_float(uint32_t in)
+{
+    return (float)(in >> 6) + (float)(in & 0x3f)/64;
+}
+
 
 const uint8_t BW_THRESHOLD = 32;
 
-///////////////////////////////////////////////////////////////
-
-const float MM_PER_INCH = 25.4;
-const float INCH_PER_PT = 0.013835;
-
-////////////////////////////////////////////////////////////////////
 
 struct {
     dim_t raster_size;
@@ -38,17 +30,24 @@ struct {
     std::string font_path;
     std::string pbm_path;
     std::string character;
+    std::vector<uint32_t> characters;
     int unicode;
+
+    std::string ref_char;
+    dim_t above_ref_char;
+    dim_t below_ref_char;
+
+
 } argsopts = { .unicode = 0 };
+
 
 int parse_options(int ac, char* av[]);
 int get_yaml_dim_node(YAML::Node &parent, std::string name, dim_t &target);
 
+
 int main(int ac, char* av[])
 {
     parse_options(ac, av);
-
-    int dpi = 891;//round(1 / argsopts.raster_size.as_inch());
 
     FT_Library library;
     FT_Face face;
@@ -61,99 +60,102 @@ int main(int ac, char* av[])
         exit(1);
     }
 
-    if (argsopts.character.empty()) {
-        if (argsopts.unicode == 0) {
-        std::cerr << "ERROR: No character oder unicode specified." << std::endl;
+    if (argsopts.characters.empty()) {
+        std::cerr << "ERROR: No characters oder unicodes specified." << std::endl;
         exit(1);
-        }
     }
 
-  error = FT_Init_FreeType(&library); /* initialize library */
-  /* error handling omitted */
+    error = FT_Init_FreeType(&library); /* initialize library */
+    /* error handling omitted */
 
-  error = FT_New_Face(library, argsopts.font_path.c_str(), 0, &face); /* create face object */
-  /* error handling omitted */
+    error = FT_New_Face(library, argsopts.font_path.c_str(), 0, &face); /* create face object */
+    /* error handling omitted */
 
-  // MEASURED FOR CORRECTING
-  char MEASURED_CHAR = 'E';
-  float ABOVE_CHAR_MM = 0.25;
-  //;float CHAR_HEIGHT_MM_MEASURED = 20.28; // should be BODY_SIZE(ca. 25.3mm) - ABOVE_CHAR - BELOW_CHAR
-  float BELOW_CHAR_MM = 4.78;
 
-  int ptsize =  round(argsopts.body_size.as_pt());
+    float dpi = (1 / argsopts.raster_size.as_inch());
+    int ptsize =  round(argsopts.body_size.as_pt());
 
-  error = FT_Set_Char_Size(face, ptsize << 6, 0, dpi, 0); /* set char size */
-  /* error handling omitted */
-  slot = face->glyph;
-  /* load glyph image into the slot (erase previous one) */
-  error = FT_Load_Char(face, MEASURED_CHAR, FT_LOAD_RENDER);
+    error = FT_Set_Char_Size(face, ptsize << 6, 0, int(round(dpi)), 0); /* set char size */
+    slot = face->glyph;
+    /* load glyph image into the slot (erase previous one) */
+    error = FT_Load_Char(face, argsopts.ref_char[0], FT_LOAD_RENDER);
 
-  // metrics
-  float PX_PER_INCH = dpi;
-  float INCH_PER_PX = 1 / PX_PER_INCH;
-  float MM_PER_PX = INCH_PER_PX * MM_PER_INCH;
-  printf("MM_PER_PX: %f\r\n", MM_PER_PX);
-  float body_size_inch = ptsize * INCH_PER_PT; // (body size of lead type)
-  float BODY_SIZE_MM = body_size_inch * MM_PER_INCH;
-  int char_width_px = slot->bitmap.width;
-  int char_height_px = slot->bitmap.rows;
-  float body_size_px = body_size_inch * PX_PER_INCH;
+    float body_size_px = argsopts.body_size.as_inch() * dpi;
 
-  // SCALE CORRECTION
-  float CHAR_HEIGHT_MM = BODY_SIZE_MM - ABOVE_CHAR_MM - BELOW_CHAR_MM;
-  printf("CHAR_HEIGHT_MM: %f\r\n", CHAR_HEIGHT_MM);
-  float CHAR_HEIGHT_UNCORRECTED_MM = char_height_px * MM_PER_PX;
-  printf("CHAR_HEIGHT_UNCORRECTED_MM: %f\r\n", CHAR_HEIGHT_UNCORRECTED_MM);
-  int CORR_dpi = round(dpi * (CHAR_HEIGHT_MM / CHAR_HEIGHT_UNCORRECTED_MM));
-  printf("CORR_dpi: %d\r\n", CORR_dpi);
-  int ABOVE_CHAR_PX = (round)(ABOVE_CHAR_MM / MM_PER_PX);
-  printf("ABOVE_CHAR_PX (w/ spec dpi): %d\r\n", ABOVE_CHAR_PX);
-  int baseline_to_char_top_olddpi = slot->bitmap_top;
-  // printf("baseline_to_char_top_olddpi (w/ spec dpi): %d\r\n",baseline_to_char_top_olddpi);
-  int baseline_to_char_top_corrdpi = round(slot->bitmap_top * (CHAR_HEIGHT_MM / CHAR_HEIGHT_UNCORRECTED_MM));
-  // printf("baseline_to_char_top_corrdpi (w/ corr dpi): %d\r\n",baseline_to_char_top_corrdpi);
-  int CORR_TYPETOP_TO_BASELINE_PX = baseline_to_char_top_corrdpi + ABOVE_CHAR_PX;
-  printf("CORR_TYPETOP_TO_BASELINE_PX: %d\r\n", CORR_TYPETOP_TO_BASELINE_PX);
-
-  // corrected load
-  error = FT_Set_Char_Size(face, ptsize << 6, 0, CORR_dpi, 0); /* set char size */
-  slot = face->glyph;
-  if (!argsopts.character.empty())
-    error = FT_Load_Char(face, argsopts.character[0], FT_LOAD_RENDER);
-  else
-    error = FT_Load_Char(face,argsopts.unicode, FT_LOAD_RENDER);
-  char_width_px = slot->bitmap.width;
-  char_height_px = slot->bitmap.rows;
-
-  // metrics2
-  int ascender_scaled = (int)(face->size->metrics.ascender >> 6);
-  int descender_scaled = (int)(face->size->metrics.descender >> 6);
-  int ascdesc_size_scaled = (int)((face->size->metrics.ascender) >> 6) + 1 - (int)((face->size->metrics.descender) >> 6);
-
-  int advanceX_px = (int)(slot->advance.x) >> 6; // round with .6 digits for accuracy? Probably fudged later anyway
-  int set_width_px = advanceX_px;
-
-  int body_size_scaled = ascdesc_size_scaled;
-  float PX_PER_SCALED = body_size_px / body_size_scaled;
-  float ascender_px = ascender_scaled * PX_PER_SCALED;
-  float descender_px = descender_scaled * PX_PER_SCALED;
-
-  int char_left_start = slot->bitmap_left;
-  // int char_top_start = round(ascender_px - slot->bitmap_top); // old, unscaled
-  int char_top_start = CORR_TYPETOP_TO_BASELINE_PX - slot->bitmap_top; // corrected stuff
+    // metrics for ttf reference glyph at intended dpi
+    int glyph_width_px = slot->bitmap.width;
+    int glyph_height_px = slot->bitmap.rows;
 
 
 
-    TypeBitmap TBM((uint32_t)set_width_px /*based on corrected dpi, advanceX*/,
-                             body_size_px /*based on uncorrected dpi, ptsize*/);
 
-    TBM.pasteGlyph((uint8_t *)(slot->bitmap.buffer), \
-                    char_width_px, char_height_px, \
-                    char_top_start, char_left_start);
+    // SCALE CORRECTION
+    dim_t lead_glyph_height(argsopts.body_size.as_mm()
+                            - argsopts.above_ref_char.as_mm()
+                            - argsopts.below_ref_char.as_mm(),mm);
+    dim_t truetype_glyph_height(glyph_height_px / dpi, inch);
 
-    TBM.threshold(BW_THRESHOLD);
-    TBM.mirror();
-    TBM.store(argsopts.pbm_path);
+    float ttf_to_lead_scaleup = lead_glyph_height.as_mm() / truetype_glyph_height.as_mm();
+        
+    int refchar_ascender_px = slot->bitmap_top;
+    float upscaled_ascender_px = refchar_ascender_px * ttf_to_lead_scaleup;
+    
+    int scaledup_dpi = int(round(dpi * ttf_to_lead_scaleup));
+    int typetop_to_baseline_px = int(round( upscaled_ascender_px +(argsopts.above_ref_char.as_inch() * dpi) ) );
+
+    printf("Glyph height in lead (mm): %f\r\n", lead_glyph_height.as_mm());
+    printf("Glyph height in TrueType (mm): %f\r\n", truetype_glyph_height.as_mm());
+    printf("dpi scaled up for lead-size glyph: %d\r\n", scaledup_dpi);
+    printf("typetop_to_baseline_px: %d\r\n", typetop_to_baseline_px);
+
+
+        // scaled up Glyph load
+    error = FT_Set_Char_Size(face, ptsize << 6, 0, scaledup_dpi, 0); /* set char size */
+    slot = face->glyph;
+
+
+    for(int i; i<argsopts.characters.size(); i++) {
+
+        uint32_t current_char = argsopts.characters[i];
+        error = FT_Load_Char(face, current_char, FT_LOAD_RENDER);
+
+        // glyph size
+        glyph_width_px = slot->bitmap.width;
+        glyph_height_px = slot->bitmap.rows;
+
+        // type size - height stays (pt size), width based on scaled-up glyph
+        float advanceX_px = i26_6_to_float(slot->advance.x);
+        int set_width_px = int(round(advanceX_px));
+
+        int char_left_start = slot->bitmap_left;
+        int char_top_start = typetop_to_baseline_px - slot->bitmap_top; // corrected stuff
+
+
+
+        TypeBitmap TBM((uint32_t)set_width_px /*based on scaled-up dpi (advanceX) */,
+                                body_size_px /*based on uncorrected dpi (ptsize) */);
+
+        TBM.pasteGlyph((uint8_t *)(slot->bitmap.buffer), \
+                        glyph_width_px, glyph_height_px, \
+                        char_top_start, char_left_start);
+
+        TBM.threshold(BW_THRESHOLD);
+        TBM.mirror();
+        std::string output_path;
+        if (current_char < 0x80) {
+            char asciistring[6];
+            sprintf(asciistring,"%c.pbm",current_char);
+            output_path = std::string(asciistring);
+        }
+        else {
+            char hexstring[11];
+            sprintf(hexstring,"U+%04x.pbm",current_char);
+            output_path = std::string(hexstring);
+        }
+        TBM.store(output_path);
+            
+        //TBM.store(argsopts.pbm_path);
+    }
 
     FT_Done_Face(face);
 
@@ -229,17 +231,26 @@ int parse_options(int ac, char* av[])
 
         get_yaml_dim_node(config, "raster size", argsopts.raster_size);
         get_yaml_dim_node(config, "body size", argsopts.body_size);
+        get_yaml_dim_node(config, "space above refchar", argsopts.above_ref_char);
+        get_yaml_dim_node(config, "space below refchar", argsopts.below_ref_char);
 
         if (config["font file"]) {
-            argsopts.font_path = config["font file"].as<std::string>();        
+            argsopts.font_path = config["font file"].as<std::string>();
         }
 
-        if (config["character"]) {
-            argsopts.character = config["character"].as<std::string>();        
+        if (config["reference character"]) {
+            argsopts.ref_char = config["reference character"].as<std::string>();
+        }
+
+        if (config["characters"]) {
+            std::string characters = config["characters"].as<std::string>();
+            for(int i=0; i< characters.size(); i++)
+                argsopts.characters.push_back((uint32_t)characters[i]);
         }
 
         if (config["unicode"]) {
-            argsopts.unicode = config["unicode"].as<int>();        
+            for(int i=0; i<  config["unicode"].size(); i++)
+                argsopts.characters.push_back((uint32_t)config["unicode"][i].as<int>());
         }
 
     }

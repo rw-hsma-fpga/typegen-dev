@@ -1,8 +1,8 @@
 # font
-font file: COOPBL.ttf
+font file: times.ttf
 
 body size:
-  value: 72
+  value: 36
   unit: pt
 
 # reference character is used to scale output to reference lead type
@@ -14,10 +14,10 @@ space below refchar:
   value: 4.78
   unit: mm
 
-characters: EQeig
+characters: E
 unicode:
-  - 0xEB # e: diakrit
-  - 0xEC # i` gravis
+  - 0x636 # 
+  - 0x62e # 
 
 # without U= for now
 #unicode: 0x45

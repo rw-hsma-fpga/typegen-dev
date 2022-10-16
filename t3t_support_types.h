@@ -5,6 +5,11 @@
 #include <string>
 
 
+const float MM_PER_INCH = 25.4;
+const float INCH_PER_PT = 0.013835; // per type history; 72pt=0.99612"
+// const float INCH_PER_PT = 0.013888; // as 1/72th of an inch
+
+
 enum dim_unit_t { mm, inch, pt };
 
 class dim_t {

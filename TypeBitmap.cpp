@@ -188,10 +188,6 @@ int TypeBitmap::pasteGlyph(uint8_t *glyph, uint32_t g_width, uint32_t g_height, 
     int g_x, g_y, bm_x, bm_y;
     
     bool glyph_fits = true;
-
-    std::cout << "bm_width: " << bm_width << std::endl;
-    std::cout << "bm_height: " << bm_height << std::endl;
-    std::cout << "pBitmap: " << static_cast<void*>(bitmap) << std::endl;
     
     if (glyph == NULL) {
         std::cout << "ERROR: No glyph allocated to paste." << std::endl;
@@ -212,20 +208,6 @@ int TypeBitmap::pasteGlyph(uint8_t *glyph, uint32_t g_width, uint32_t g_height, 
                 continue;
             }
             
-            //bitmap[bm_y*bm_width + bm_x] = 31;
-
-    //std::cout << "g_width: " << g_width << std::endl;
-    //std::cout << "g_height: " << g_height << std::endl;
-    //std::cout << "pGlyph: " << static_cast<void*>(glyph) << std::endl;
-
-    //std::cout << "top_pos: " << top_pos << std::endl;
-    //std::cout << "left_pos: " << left_pos << std::endl;
-
-    //std::cout << "pGlyph[X/Y]: " << static_cast<void*>(&glyph[g_y*g_width + g_x]) << std::endl;
-    //std::cout << "g_y*g_width + g_x: " << (g_y*g_width + g_x) << std::endl;
-    //std::cout << "glyph X/Y: " << g_x << " " << g_y << std::endl;
-
-            //glyph[g_y*g_width + g_x] = 42;
             bitmap[bm_y*bm_width + bm_x] = glyph[g_y*g_width + g_x];
         }
     }
