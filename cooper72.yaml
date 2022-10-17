@@ -14,10 +14,10 @@ space below refchar:
   value: 4.78
   unit: mm
 
-characters: EQeig
-unicode:
-  - 0xEB # e: diakrit
-  - 0xEC # i` gravis
+characters: i
+#unicode:
+#  - 0xEB # e: diakrit
+#  - 0xEC # i` gravis
 
 # without U= for now
 #unicode: 0x45

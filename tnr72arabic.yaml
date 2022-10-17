@@ -2,16 +2,16 @@
 font file: times.ttf
 
 body size:
-  value: 36
+  value: 50
   unit: pt
 
 # reference character is used to scale output to reference lead type
 reference character: E
 space above refchar:
-  value: 0.25
+  value: 0.55
   unit: mm
 space below refchar:
-  value: 4.78
+  value: 6.78
   unit: mm
 
 characters: E

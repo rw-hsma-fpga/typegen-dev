@@ -74,7 +74,7 @@ int main(int ac, char* av[])
     /* error handling omitted */
 
 
-    float dpi = (1 / argsopts.raster_size.as_inch());
+    float dpi = (1 / (argsopts.raster_size.as_inch() )); /// UVstretchXY
     int ptsize =  round(argsopts.body_size.as_pt());
 
     error = FT_Set_Char_Size(face, ptsize << 6, 0, int(round(dpi)), 0); /* set char size */
@@ -114,6 +114,7 @@ int main(int ac, char* av[])
         // scaled up Glyph load
     error = FT_Set_Char_Size(face, ptsize << 6, 0, scaledup_dpi, 0); /* set char size */
     slot = face->glyph;
+
 
 
     for(int i=0; i<argsopts.characters.size(); i++) {

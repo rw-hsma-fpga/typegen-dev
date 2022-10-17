@@ -11,5 +11,5 @@ layer height:
 # UV curing time: 15min
 
 # measured shrinkage against intended size - needed for fudge factors
-XYshrink_pct: -50.0 # -0.75
-Zshrink_pct: -33.3 #-0.93
+XYshrink_pct: -0.75
+Zshrink_pct: -0.93
