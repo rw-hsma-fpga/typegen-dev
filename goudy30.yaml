@@ -1,23 +1,24 @@
 # font
-font file: COOPBL.ttf
+font file: GOUDOS.TTF
 
 body size:
-  value: 72
+  value: 30
   unit: pt
 
 # reference character is used to scale output to reference lead type
-reference character: E
+reference character: 4
 space above refchar:
-  value: 0.25
+  value: 0.62
   unit: mm
 space below refchar:
-  value: 4.78
+  value: 1.37
   unit: mm
 
-characters: EQhrig
-unicode:
-  - 0xEB # e: diakrit
-  - 0xEC # i` gravis
+characters: AQ467
+
+#unicode:
+#  - 0xEB # e: diakrit
+#  - 0xEC # i` gravis
 
 # without U= for now
 #unicode: 0x45

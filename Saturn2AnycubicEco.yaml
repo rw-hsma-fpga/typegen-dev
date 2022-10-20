@@ -12,4 +12,4 @@ layer height:
 
 # measured shrinkage against intended size - needed for fudge factors
 XYshrink_pct: -0.75
-Zshrink_pct: -0.93
+Zshrink_pct: -2.00

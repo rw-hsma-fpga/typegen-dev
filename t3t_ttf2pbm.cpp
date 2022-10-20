@@ -21,7 +21,7 @@ inline float i26_6_to_float(uint32_t in)
 }
 
 
-const uint8_t BW_THRESHOLD = 32;
+const uint8_t BW_THRESHOLD = 1;
 
 
 struct {
@@ -53,7 +53,6 @@ int main(int ac, char* av[])
 
     FT_Library library;
     FT_Face face;
-
     FT_GlyphSlot slot;
     FT_Error error;
 
@@ -68,19 +67,33 @@ int main(int ac, char* av[])
     }
 
     error = FT_Init_FreeType(&library); /* initialize library */
-    /* error handling omitted */
+    if (error) {
+        std::cout << "Error: FT_Init_FreeType() failed with error " << error << std::endl;
+        exit(1);
+    }
 
     error = FT_New_Face(library, argsopts.font_path.c_str(), 0, &face); /* create face object */
-    /* error handling omitted */
+    if (error) {
+        std::cout << "Error: FT_New_Face() failed with error " << error << std::endl;
+        exit(1);
+    }
 
 
-    float dpi = (1 / (argsopts.raster_size.as_inch() )); /// UVstretchXY
+    float dpi = (1 / (argsopts.raster_size.as_inch() / UVstretchXY )); /// UVstretchXY
     int ptsize =  round(argsopts.body_size.as_pt());
 
     error = FT_Set_Char_Size(face, ptsize << 6, 0, int(round(dpi)), 0); /* set char size */
+    if (error) {
+        std::cout << "Error: FT_Set_Char_Size() failed with error " << error << std::endl;
+        exit(1);
+    }
     slot = face->glyph;
     /* load glyph image into the slot (erase previous one) */
     error = FT_Load_Char(face, argsopts.ref_char[0], FT_LOAD_RENDER);
+    if (error) {
+        std::cout << "Error: FT_Load_Char() failed with error " << error << std::endl;
+        exit(1);
+    }
 
     float body_size_px = argsopts.body_size.as_inch() * dpi;
 
@@ -113,6 +126,11 @@ int main(int ac, char* av[])
 
         // scaled up Glyph load
     error = FT_Set_Char_Size(face, ptsize << 6, 0, scaledup_dpi, 0); /* set char size */
+    if (error) {
+        std::cout << "Error: FT_Set_Char_Size() failed with error " << error << std::endl;
+        exit(1);
+    }
+
     slot = face->glyph;
 
 
@@ -121,7 +139,10 @@ int main(int ac, char* av[])
 
         uint32_t current_char = argsopts.characters[i];
         error = FT_Load_Char(face, current_char, FT_LOAD_RENDER);
-
+        if (error) {
+            std::cout << "Error: FT_Load_Char() failed with error " << error << std::endl;
+            exit(1);
+        }
         // glyph size
         glyph_width_px = slot->bitmap.width;
         glyph_height_px = slot->bitmap.rows;

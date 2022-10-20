@@ -31,11 +31,13 @@ int TypeBitmap::newBitmap(uint32_t width, uint32_t height)
     bm_height = height;
 
     bitmap = (uint8_t*)calloc(bm_width*bm_height, sizeof(uint8_t));
+DEBUG_alloc_size = bm_width * bm_height * sizeof(uint8_t);
     if (bitmap != NULL) {
         loaded = true;
         return 0;
     }
     else {
+DEBUG_alloc_size = 0;
         return -1;
     }
 }
@@ -82,7 +84,9 @@ int TypeBitmap::load(std::string filename)
     }
 
     bitmap = (uint8_t*)calloc(size = bm_width*bm_height, sizeof(uint8_t));
+DEBUG_alloc_size = bm_width * bm_height * sizeof(uint8_t);
     if (bitmap == NULL) {
+DEBUG_alloc_size = 0;
         std::cerr << "ERROR: Bitmap buffer allocation failed" << std::endl;
         pbm.close();
         return -1;
@@ -250,13 +254,19 @@ void TypeBitmap::mirror() {
     uint8_t *buf = bitmap;
     uint8_t swap;
 
+    if (!loaded)
+        return; //-1;
+
     for (y = 0; y < h; y++)
     {
         for (x = 0; x < (w >> 1); x++)
         {
-        swap = buf[y * w + x];
-        buf[y * w + x] = buf[y * w + w - x];
-        buf[y * w + w - x] = swap;
+            int indexA = y * w + x;
+            int indexB = y * w + ((w-1) - x);
+
+            swap = buf[indexA];
+            buf[indexA] = buf[indexB];
+            buf[indexB] = swap;
         }
     }
     return;

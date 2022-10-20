@@ -12,6 +12,7 @@ class TypeBitmap {
     uint8_t *bitmap;
     uint32_t bm_width;
     uint32_t bm_height;
+    size_t DEBUG_alloc_size;
 
     dim_t type_height;
     dim_t depth_of_drive;
