@@ -14,3 +14,8 @@ g++  -std=c++2a -o t3t_ttf2pbm  \
      -lyaml-cpp   -I/usr/local/include/yaml-cpp/  \
      -lfreetype   -lm -I/home/esr/freetype/include/  \
      -lboost_program_options
+
+g++  -std=c++2a -o t3t_STLcompiler  \
+     t3t_support_types.cpp t3t_STLcompiler.cpp \
+     -lyaml-cpp   -I/usr/local/include/yaml-cpp/  \
+     -lboost_program_options
