@@ -4,7 +4,7 @@ type height:
   unit: inch
 
 depth of drive:
-  value: 1.6
+  value: 2.0
   unit: mm
 
 reduced foot XY:
@@ -15,5 +15,5 @@ reduced foot Z:
   value: 4.0
   unit: mm
 
-reduced foot mode: bevel
+reduced foot mode: step
 

@@ -75,10 +75,11 @@ int main()
             entry.clear();
         }
 
+        uint32_t max_line_y = 0;
+
         // line items
         for(int k=0; k<line.size(); k++) {
-            //std::cout << line[k] << " / ";
-            //std::cout << std::endl;
+
             inputSTL.filename = line[k] + ".stl";
             ifstream stl_in(inputSTL.filename) ;
             if (!stl_in.is_open()) {
@@ -90,7 +91,6 @@ int main()
 
             inputSTL.triangles = (stl_tri_t*)malloc(sizeof(stl_tri_t)*inputSTL.tri_count);
             if (inputSTL.triangles) {
-// cout << "Tri count: " << inputSTL.tri_count << endl;
                 for(int m=0; m<inputSTL.tri_count; m++) {
                     stl_in.read((char*)&(inputSTL.triangles[m]), 50);
                 }
@@ -138,8 +138,8 @@ int main()
             cout << endl;
             */
 
-            float offsetX = posX;
-            float offsetY = posY;
+            float offsetX = posX -(inputSTL.lowX);
+            float offsetY = posY -(inputSTL.lowY);
             float offsetZ = -(inputSTL.lowZ);
 
             for(int m=0; m<inputSTL.tri_count; m++) {
@@ -167,8 +167,11 @@ int main()
             posX += gapX;
         }
 
+        if ((inputSTL.highY-inputSTL.lowY) > max_line_y)
+            max_line_y = (inputSTL.highY-inputSTL.lowY);
+
         // ADD Y- POS, set X = 0;
-        posY -= (inputSTL.highY-inputSTL.lowY); // property of last type in line online
+        posY -= max_line_y;
         posY -= gapY;
         posX = 0.0;
     }

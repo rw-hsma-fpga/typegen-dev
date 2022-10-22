@@ -2,7 +2,7 @@
 font file: TOSUBBL.ttf
 
 body size:
-  value: 48
+  value: 30
   unit: pt
 
 # reference character is used to scale output to reference lead type

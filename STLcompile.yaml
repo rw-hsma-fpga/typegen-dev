@@ -1,15 +1,16 @@
 # all in mm
 platform size X: 200.0
 platform size Y: 100.0
-gap X: 5.0
-gap Y: 5.0
+gap X: 4.0
+gap Y: 4.0
 
 
 # Todo: Dimensions, left/right/top/bottom modes, break at line end options, etc.
 
 # rows
 structure:
-  - A A B B C C D D E E F F G G
-  - H H I I J J K K L L M M N N
-  - O O P P Q Q R R S S T T U U
-  - V V W W X X Y Y Z Z
+  - _1c _1b _1a A A B . C D D _2a _2b _2c
+  - E E E F F . G G H H I I
+  - K L L L U+2019 T T M M N N
+  - O O O U+2019 P Q S S R R J 
+  - _3c _3b _3a U U V W Y Y _4a _4b _4c
