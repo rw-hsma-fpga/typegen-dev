@@ -1,0 +1,27 @@
+# font
+font file: TOSUBBL.ttf
+
+body size:
+  value: 60
+  unit: pt
+
+# reference character is used to scale output to reference lead type
+reference character: E
+space above refchar:
+  value: 1.00
+  unit: mm
+space below refchar:
+  value: 2.00
+  unit: mm
+
+characters: ABCDEFGHIJKLMNOPQRSTUVWXYZ
+
+#unicode:
+#  - 0xEB # e: diakrit
+#  - 0xEC # i` gravis
+
+# without U= for now
+#unicode: 0x45
+
+
+# font scaling mode and parameters
