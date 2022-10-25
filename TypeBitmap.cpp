@@ -3,6 +3,8 @@
 #include <fstream>
 #include <string>
 #include <cstdlib>
+#include <cmath>
+//#include <numbers>
 #include <boost/format.hpp> 
 
 
@@ -296,6 +298,145 @@ inline void TypeBitmap::STL_triangle_write(std::ofstream &outfile, pos3d_t N, po
 }
 
 
+inline void TypeBitmap::STL_rect_write(std::ofstream &outfile, pos3d_t N, pos3d_t v1, pos3d_t v2, pos3d_t v3, pos3d_t v4, uint32_t &count)
+{
+    // TODO: Only works for normal vectors with only one non-0 component so far! Do real projection later
+    float twoPi = 8*atan(1);
+
+    struct prj2d_t {
+        pos3d_t *vert3d;
+        float px;
+        float py;
+        float angle;
+        uint8_t pos;
+    };
+
+    prj2d_t proj[4];
+    proj[0].vert3d = &v1;
+    proj[0].pos = 0;
+
+    proj[1].vert3d = &v2;
+    proj[1].pos = 1;
+
+    proj[2].vert3d = &v3;
+    proj[2].pos = 2;
+
+    proj[3].vert3d = &v4;
+    proj[3].pos = 3;
+
+    for (int i=0; i<4; i++) {
+        if (N.z > 0) {
+            proj[i].px = + proj[i].vert3d->x;
+            proj[i].py = + proj[i].vert3d->y;
+            continue;
+        }
+        if (N.z < 0) { // could also swap y instead I think
+            proj[i].px = - proj[i].vert3d->x;
+            proj[i].py = + proj[i].vert3d->y;
+            continue;
+        }
+        if (N.y > 0) {
+            proj[i].px = + proj[i].vert3d->x;
+            proj[i].py = - proj[i].vert3d->z;
+            continue;
+        }
+        if (N.y < 0) {
+            proj[i].px = + proj[i].vert3d->x;
+            proj[i].py = + proj[i].vert3d->z;
+            continue;
+        }
+        if (N.x > 0) {
+            proj[i].px = - proj[i].vert3d->z;
+            proj[i].py = + proj[i].vert3d->y;
+            continue;
+        }
+        if (N.x < 0) {
+            proj[i].px = + proj[i].vert3d->z;
+            proj[i].py = + proj[i].vert3d->y;
+            continue;
+        }
+    }
+
+    float center_x = (proj[0].px + proj[1].px + proj[2].px + proj[3].px) / 4;
+    float center_y = (proj[0].py + proj[1].py + proj[2].py + proj[3].py) / 4;
+
+    for (int i=0; i<4; i++) {
+        float deltax = proj[i].px - center_x;
+        float deltay = proj[i].py - center_y;
+        float norm = sqrt(deltax*deltax + deltay*deltay);
+        deltax /= norm;
+        //deltay /= norm; // abs value not used
+        float ang = acos(deltax);
+        if (deltay < 0)
+        
+            ang = twoPi - ang; // 0..2pi position at this point
+
+        proj[i].angle = ang;
+        if (i!=0) {
+            if (proj[i].angle < proj[0].angle)
+                proj[i].angle += twoPi;
+        }
+        
+    }
+
+    // bubble sort 1..3
+    uint8_t swap_pos;
+    float swap_angle;
+    pos3d_t *swap_vert3d;
+
+    for (int i=0; i<3; i++) {
+        int j = (i % 2)+1; // 1-2,2-3,1-2,done
+        if (proj[j].angle > proj[j+1].angle) {
+            swap_pos    = proj[j].pos;
+            swap_angle  = proj[j].angle;
+            swap_vert3d = proj[j].vert3d;
+            proj[j].pos    = proj[j+1].pos;
+            proj[j].angle  = proj[j+1].angle;
+            proj[j].vert3d = proj[j+1].vert3d;
+            proj[j+1].pos    = swap_pos;
+            proj[j+1].angle  = swap_angle;
+            proj[j+1].vert3d = swap_vert3d;
+        }
+    }
+/*
+    for (int i=0; i<4; i++) {
+        if (i!=3)
+        std::cout << "X/Y/Z "
+        << proj[i].vert3d->x << " / "
+        << proj[i].vert3d->y << " / "
+        << proj[i].vert3d->z << " - Angle: " << proj[i].angle << std::endl;
+    }
+    std::cout << "------------------------------------" << std::endl;
+
+    for (int i=0; i<4; i++) {
+        if (i!=1)
+        std::cout << "X/Y/Z "
+        << proj[i].vert3d->x << " / "
+        << proj[i].vert3d->y << " / "
+        << proj[i].vert3d->z << " - Angle: " << proj[i].angle << std::endl;
+    }
+exit(1);
+*/
+    stl_tri_t TRI;
+    TRI = (stl_tri_t) {N.x, N.y, N.z,
+                       proj[0].vert3d->x, proj[0].vert3d->y, proj[0].vert3d->z,
+                       proj[1].vert3d->x, proj[1].vert3d->y, proj[1].vert3d->z,
+                       proj[2].vert3d->x, proj[2].vert3d->y, proj[2].vert3d->z,
+                       0};
+    outfile.write((const char*)&TRI, 50);
+    count++;
+
+    TRI = (stl_tri_t) {N.x, N.y, N.z,
+                       proj[0].vert3d->x, proj[0].vert3d->y, proj[0].vert3d->z,
+                       proj[2].vert3d->x, proj[2].vert3d->y, proj[2].vert3d->z,
+                       proj[3].vert3d->x, proj[3].vert3d->y, proj[3].vert3d->z,
+                       0};
+    outfile.write((const char*)&TRI, 50);
+    count++;
+    
+}
+
+
 int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, dim_t footXY, dim_t footZ, float UVstretchZ)
 {
     int x, y;
@@ -522,6 +663,23 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
 
     // cube corners: upper/lower;top/botton;left/right
     pos3d_t utl, utr, ubl, ubr, ltl, ltr, lbl, lbr;
+/*
+    //////////////
+    // Rectout experimentations
+    utl = (pos3d_t){-1, 1, 0};
+    utr = (pos3d_t){+1, 1, 0};
+    ubl = (pos3d_t){-1,-1, 0};
+    ubr = (pos3d_t){+1,-1, 0};
+    STL_rect_write(stl_out,
+                    Zp,
+                    ubr, utl, ubl, utr,
+                    tri_cnt);
+    //STL_rect_write(stl_out, \
+                    Zn, \
+                    ubr, utr, ubl, utl, \
+                    tri_cnt);
+    //////////////
+*/
 
     // SINGLE PIXELS
     for (y = 0; y < bm_height; y++) {
@@ -541,15 +699,17 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
             // single pixel upper faces (glyph)
             if (buf32[y * w + x] == +1) {
                 // upper face
-                STL_triangle_write(stl_out, Zp, utr, utl, ubl, tri_cnt);
-                STL_triangle_write(stl_out, Zp, utr, ubl, ubr, tri_cnt);
+                STL_rect_write(stl_out, Zp, utr, utl, ubl, ubr, tri_cnt);
+                //STL_triangle_write(stl_out, Zp, utr, utl, ubl, tri_cnt);
+                //STL_triangle_write(stl_out, Zp, utr, ubl, ubr, tri_cnt);
             }
 
             // single pixel upper faces (body / no glyph)
             if (buf32[y * w + x] == -1) {
                 // lower faces become upper faces of body for 0
-                STL_triangle_write(stl_out, Zp, ltr, lbl, ltl, tri_cnt);
-                STL_triangle_write(stl_out, Zp, ltr, lbr, lbl, tri_cnt);
+                STL_rect_write(stl_out, Zp, ltr, lbl, ltl, lbr, tri_cnt);
+                //STL_triangle_write(stl_out, Zp, ltr, lbl, ltl, tri_cnt);
+                //STL_triangle_write(stl_out, Zp, ltr, lbr, lbl, tri_cnt);
             }
 
             // side walls of glyph
@@ -558,26 +718,30 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
 
                 // left face
                 if ((x == 0) || (buf32[((y)*w) + (x - 1)] < 0)) {
-                    STL_triangle_write(stl_out, Xn, ubl, utl, ltl, tri_cnt);
-                    STL_triangle_write(stl_out, Xn, ubl, ltl, lbl, tri_cnt);
+                    STL_rect_write(stl_out, Xn, ubl, utl, ltl, lbl, tri_cnt);
+                    //STL_triangle_write(stl_out, Xn, ubl, utl, ltl, tri_cnt);
+                    //STL_triangle_write(stl_out, Xn, ubl, ltl, lbl, tri_cnt);
                 }
 
                 // right face
                 if ((x == (bm_width - 1)) || (buf32[((y)*w) + (x + 1)] < 0)) {
-                    STL_triangle_write(stl_out, Xp, ubr, ltr, utr, tri_cnt);
-                    STL_triangle_write(stl_out, Xp, ubr, lbr, ltr, tri_cnt);
+                    STL_rect_write(stl_out, Xp, ubr, ltr, utr, lbr, tri_cnt);
+                    //STL_triangle_write(stl_out, Xp, ubr, ltr, utr, tri_cnt);
+                    //STL_triangle_write(stl_out, Xp, ubr, lbr, ltr, tri_cnt);
                 }
 
                 // top face
                 if ((y == 0) || (buf32[((y - 1) * w) + (x)] < 0)) {
-                    STL_triangle_write(stl_out, Yp, utl, utr, ltr, tri_cnt);
-                    STL_triangle_write(stl_out, Yp, utl, ltr, ltl, tri_cnt);
+                    STL_rect_write(stl_out, Yp, utl, utr, ltr, ltl, tri_cnt);
+                    //STL_triangle_write(stl_out, Yp, utl, utr, ltr, tri_cnt);
+                    //STL_triangle_write(stl_out, Yp, utl, ltr, ltl, tri_cnt);
                 }
 
                 // bottom face
                 if ((y == (bm_height - 1)) || (buf32[((y + 1) * w) + (x)] < 0)) {
-                    STL_triangle_write(stl_out, Yn, ubl, lbr, ubr, tri_cnt);
-                    STL_triangle_write(stl_out, Yn, ubl, lbl, lbr, tri_cnt);
+                    STL_rect_write(stl_out, Yn, ubl, lbr, ubr, lbl, tri_cnt);
+                    //STL_triangle_write(stl_out, Yn, ubl, lbr, ubr, tri_cnt);
+                    //STL_triangle_write(stl_out, Yn, ubl, lbl, lbr, tri_cnt);
                 }
             }
         }
@@ -591,8 +755,9 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
             ubl = (pos3d_t){RS * R.left, -RS * (R.bottom + 1), DOD};
             ubr = (pos3d_t){RS * (R.right + 1), -RS * (R.bottom + 1), DOD};
 
-            STL_triangle_write(stl_out, Zp, utr, utl, ubl, tri_cnt);
-            STL_triangle_write(stl_out, Zp, utr, ubl, ubr, tri_cnt);
+            STL_rect_write(stl_out, Zp, utr, utl, ubl, ubr, tri_cnt);
+            //STL_triangle_write(stl_out, Zp, utr, utl, ubl, tri_cnt);
+            //STL_triangle_write(stl_out, Zp, utr, ubl, ubr, tri_cnt);
     }
 
     for (i = 0; i < body_rects.size(); i++) {
@@ -603,8 +768,9 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
             lbl = (pos3d_t){RS * R.left, -RS * (R.bottom + 1), 0};
             lbr = (pos3d_t){RS * (R.right + 1), -RS * (R.bottom + 1), 0};
 
-            STL_triangle_write(stl_out, Zp, ltr, lbl, ltl, tri_cnt);
-            STL_triangle_write(stl_out, Zp, ltr, lbr, lbl, tri_cnt);
+            STL_rect_write(stl_out, Zp, ltr, lbl, ltl, lbr, tri_cnt);
+            //STL_triangle_write(stl_out, Zp, ltr, lbl, ltl, tri_cnt);
+            //STL_triangle_write(stl_out, Zp, ltr, lbr, lbl, tri_cnt);
     }
 
 
@@ -623,20 +789,24 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
     lbr = (pos3d_t){RS * w, -RS * h, -(BH-FZ)};
 
     // left face
-    STL_triangle_write(stl_out, Xn, ubl, utl, ltl, tri_cnt);
-    STL_triangle_write(stl_out, Xn, ubl, ltl, lbl, tri_cnt);
+    STL_rect_write(stl_out, Xn, ubl, utl, ltl, lbl, tri_cnt);
+    //STL_triangle_write(stl_out, Xn, ubl, utl, ltl, tri_cnt);
+    //STL_triangle_write(stl_out, Xn, ubl, ltl, lbl, tri_cnt);
 
     // right face
-    STL_triangle_write(stl_out, Xp, ubr, ltr, utr, tri_cnt);
-    STL_triangle_write(stl_out, Xp, ubr, lbr, ltr, tri_cnt);
+    STL_rect_write(stl_out, Xp, ubr, ltr, utr, lbr, tri_cnt);
+    //STL_triangle_write(stl_out, Xp, ubr, ltr, utr, tri_cnt);
+    //STL_triangle_write(stl_out, Xp, ubr, lbr, ltr, tri_cnt);
 
     // top face
-    STL_triangle_write(stl_out, Yp, utl, utr, ltr, tri_cnt);
-    STL_triangle_write(stl_out, Yp, utl, ltr, ltl, tri_cnt);
+    STL_rect_write(stl_out, Yp, utl, utr, ltr, ltl, tri_cnt);
+    //STL_triangle_write(stl_out, Yp, utl, utr, ltr, tri_cnt);
+    //STL_triangle_write(stl_out, Yp, utl, ltr, ltl, tri_cnt);
 
     // bottom face
-    STL_triangle_write(stl_out, Yn, ubl, lbr, ubr, tri_cnt);
-    STL_triangle_write(stl_out, Yn, ubl, lbl, lbr, tri_cnt);
+    STL_rect_write(stl_out, Yn, ubl, lbr, ubr, lbl, tri_cnt);
+    //STL_triangle_write(stl_out, Yn, ubl, lbr, ubr, tri_cnt);
+    //STL_triangle_write(stl_out, Yn, ubl, lbl, lbr, tri_cnt);
 
 
     // lower(lowest) face - bevel/step foot
@@ -654,29 +824,34 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
         ubr = (pos3d_t){RS*w - FXY, -RS*h + FXY, -(BH-FZ)};
 
         // left face
-        STL_triangle_write(stl_out, Xn, ubl, utl, ltl, tri_cnt);
-        STL_triangle_write(stl_out, Xn, ubl, ltl, lbl, tri_cnt);
+        STL_rect_write(stl_out, Xn, ubl, utl, ltl, lbl, tri_cnt);
+        //STL_triangle_write(stl_out, Xn, ubl, utl, ltl, tri_cnt);
+        //STL_triangle_write(stl_out, Xn, ubl, ltl, lbl, tri_cnt);
 
         // right face
-        STL_triangle_write(stl_out, Xp, ubr, ltr, utr, tri_cnt);
-        STL_triangle_write(stl_out, Xp, ubr, lbr, ltr, tri_cnt);
+        STL_rect_write(stl_out, Xp, ubr, ltr, utr, lbr, tri_cnt);
+        //STL_triangle_write(stl_out, Xp, ubr, ltr, utr, tri_cnt);
+        //STL_triangle_write(stl_out, Xp, ubr, lbr, ltr, tri_cnt);
 
         // top face
-        STL_triangle_write(stl_out, Yp, utl, utr, ltr, tri_cnt);
-        STL_triangle_write(stl_out, Yp, utl, ltr, ltl, tri_cnt);
+        STL_rect_write(stl_out, Yp, utl, utr, ltr, ltl, tri_cnt);
+        //STL_triangle_write(stl_out, Yp, utl, utr, ltr, tri_cnt);
+        //STL_triangle_write(stl_out, Yp, utl, ltr, ltl, tri_cnt);
 
         // bottom face
-        STL_triangle_write(stl_out, Yn, ubl, lbr, ubr, tri_cnt);
-        STL_triangle_write(stl_out, Yn, ubl, lbl, lbr, tri_cnt);
+        STL_rect_write(stl_out, Yn, ubl, lbr, ubr, lbl, tri_cnt);
+        //STL_triangle_write(stl_out, Yn, ubl, lbr, ubr, tri_cnt);
+        //STL_triangle_write(stl_out, Yn, ubl, lbl, lbr, tri_cnt);
 
     }
 
+    // TODO: NEEDS SUPPORT FOR SLANTED NORMALS
     if (foot_mode == bevel) { // beveled foot
         utl = (pos3d_t){0, 0, -(BH-FZ)};
         utr = (pos3d_t){RS * w, 0, -(BH-FZ)};
         ubl = (pos3d_t){0, -RS * h, -(BH-FZ)};
         ubr = (pos3d_t){RS * w, -RS * h, -(BH-FZ)};
-
+/*
         // left face
         STL_triangle_write(stl_out, LD, ubl, utl, ltl, tri_cnt);
         STL_triangle_write(stl_out, LD, ubl, ltl, lbl, tri_cnt);
@@ -692,7 +867,7 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
         // bottom face
         STL_triangle_write(stl_out, BD, ubl, lbr, ubr, tri_cnt);
         STL_triangle_write(stl_out, BD, ubl, lbl, lbr, tri_cnt);
-
+*/
     }
 
     // bevel/step foot
@@ -704,8 +879,9 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
     }
 
     // lower face - prepared XY coordinates differ between foot_mode "none" and "bevel/step"
-    STL_triangle_write(stl_out, Zn, ltr, lbl, ltl, tri_cnt);
-    STL_triangle_write(stl_out, Zn, ltr, lbr, lbl, tri_cnt);
+    STL_rect_write(stl_out, Zn, ltr, lbl, ltl, lbr, tri_cnt);
+    //STL_triangle_write(stl_out, Zn, ltr, lbl, ltl, tri_cnt);
+    //STL_triangle_write(stl_out, Zn, ltr, lbr, lbl, tri_cnt);
 
     if (foot_mode == step) { // stepped foot
         // downlooking faces around step rim
@@ -722,20 +898,24 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
         lbr = (pos3d_t){RS*w - FXY, -RS*h + FXY, -(BH-FZ)};
 
         // left downward face
-        STL_triangle_write(stl_out, Zn, ubl, utl, ltl, tri_cnt);
-        STL_triangle_write(stl_out, Zn, ubl, ltl, lbl, tri_cnt);
+        STL_rect_write(stl_out, Zn, ubl, utl, ltl, lbl, tri_cnt);
+        //STL_triangle_write(stl_out, Zn, ubl, utl, ltl, tri_cnt);
+        //STL_triangle_write(stl_out, Zn, ubl, ltl, lbl, tri_cnt);
 
         // right downward face
-        STL_triangle_write(stl_out, Zn, ubr, ltr, utr, tri_cnt);
-        STL_triangle_write(stl_out, Zn, ubr, lbr, ltr, tri_cnt);
+        STL_rect_write(stl_out, Zn, ubr, ltr, utr, lbr, tri_cnt);
+        //STL_triangle_write(stl_out, Zn, ubr, ltr, utr, tri_cnt);
+        //STL_triangle_write(stl_out, Zn, ubr, lbr, ltr, tri_cnt);
 
         // top downward face
-        STL_triangle_write(stl_out, Zn, utl, utr, ltr, tri_cnt);
-        STL_triangle_write(stl_out, Zn, utl, ltr, ltl, tri_cnt);
+        STL_rect_write(stl_out, Zn, utl, utr, ltr, ltl, tri_cnt);
+        //STL_triangle_write(stl_out, Zn, utl, utr, ltr, tri_cnt);
+        //STL_triangle_write(stl_out, Zn, utl, ltr, ltl, tri_cnt);
 
         // bottom downward face
-        STL_triangle_write(stl_out, Zn, ubl, lbr, ubr, tri_cnt);
-        STL_triangle_write(stl_out, Zn, ubl, lbl, lbr, tri_cnt);
+        STL_rect_write(stl_out, Zn, ubl, lbr, ubr, lbl, tri_cnt);
+        //STL_triangle_write(stl_out, Zn, ubl, lbr, ubr, tri_cnt);
+        //STL_triangle_write(stl_out, Zn, ubl, lbl, lbr, tri_cnt);
     }
 
 
