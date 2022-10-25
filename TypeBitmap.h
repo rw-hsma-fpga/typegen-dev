@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 #include "t3t_support_types.h"
 
 enum reduced_foot_mode {none, bevel, step};
@@ -12,7 +13,16 @@ class TypeBitmap {
     uint8_t *bitmap;
     uint32_t bm_width;
     uint32_t bm_height;
-    size_t DEBUG_alloc_size;
+
+    // for optimized STL conversion
+    int32_t *tag_bitmap_i32;
+    struct STLrect {
+        uint32_t top, left, bottom, right;
+        int32_t tag;
+    };
+    std::vector<STLrect> glyph_rects;
+    std::vector<STLrect> body_rects;
+
 
     dim_t type_height;
     dim_t depth_of_drive;

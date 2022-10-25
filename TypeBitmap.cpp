@@ -8,18 +8,18 @@
 
 
 TypeBitmap::TypeBitmap()
-            : loaded(false), bm_width(0), bm_height(0), bitmap(NULL) {}
+            : loaded(false), bm_width(0), bm_height(0), bitmap(NULL), tag_bitmap_i32(NULL) {}
 
 
 TypeBitmap::TypeBitmap(std::string filename)
-            : loaded(false), bm_width(0), bm_height(0), bitmap(NULL)
+            : loaded(false), bm_width(0), bm_height(0), bitmap(NULL), tag_bitmap_i32(NULL)
 {
     unload();
     load(filename);
 }
 
 TypeBitmap::TypeBitmap(uint32_t width, uint32_t height)
-            : loaded(false), bm_width(0), bm_height(0), bitmap(NULL)
+            : loaded(false), bm_width(0), bm_height(0), bitmap(NULL), tag_bitmap_i32(NULL)
 {
     newBitmap(width, height);
 }
@@ -31,13 +31,12 @@ int TypeBitmap::newBitmap(uint32_t width, uint32_t height)
     bm_height = height;
 
     bitmap = (uint8_t*)calloc(bm_width*bm_height, sizeof(uint8_t));
-DEBUG_alloc_size = bm_width * bm_height * sizeof(uint8_t);
+
     if (bitmap != NULL) {
         loaded = true;
         return 0;
     }
     else {
-DEBUG_alloc_size = 0;
         return -1;
     }
 }
@@ -84,9 +83,8 @@ int TypeBitmap::load(std::string filename)
     }
 
     bitmap = (uint8_t*)calloc(size = bm_width*bm_height, sizeof(uint8_t));
-DEBUG_alloc_size = bm_width * bm_height * sizeof(uint8_t);
+
     if (bitmap == NULL) {
-DEBUG_alloc_size = 0;
         std::cerr << "ERROR: Bitmap buffer allocation failed" << std::endl;
         pbm.close();
         return -1;
@@ -138,6 +136,11 @@ DEBUG_alloc_size = 0;
 
 void TypeBitmap::unload()
 {
+    if (tag_bitmap_i32 != NULL) {
+        free(tag_bitmap_i32);
+    }
+    tag_bitmap_i32 = NULL;
+
     if (bitmap != NULL) {
         free(bitmap);
     }
@@ -296,12 +299,13 @@ inline void TypeBitmap::STL_triangle_write(std::ofstream &outfile, pos3d_t N, po
 int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, dim_t footXY, dim_t footZ, float UVstretchZ)
 {
     int x, y;
-    int i;
+    int i, j, k;
     int w = bm_width;
     int h = bm_height;
     unsigned int tri_cnt = 0;
 
-    unsigned char *buf = (unsigned char*)bitmap;
+    uint8_t *buf8 = (uint8_t*)bitmap;
+    int32_t *buf32;
 
     float RS = raster_size.as_mm();
     float DOD = UVstretchZ*depth_of_drive.as_mm();
@@ -332,6 +336,167 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
         return -1;
     }
 
+    glyph_rects.clear();
+    body_rects.clear();
+
+    tag_bitmap_i32 = (int32_t*)calloc(w*h, sizeof(int32_t));
+    if (tag_bitmap_i32 == NULL) {
+        std::cerr << "ERROR: Could not open allocate tag bitmap." << std::endl;
+        return -1;
+    }
+    buf32 = tag_bitmap_i32;
+
+    for (y = 0; y < bm_height; y++) {
+        for (x = 0; x < bm_width; x++) {
+            if (*buf8++)
+                *buf32++ = +1;
+            else
+                *buf32++ = -1;
+        }
+    }
+    buf32 = tag_bitmap_i32;
+
+    // pseudo randomized loop
+    srand(0xB747);
+    int32_t tag_cnt = 2;
+    
+    const int ITERATIONS = 100000;
+
+    for (i = 0; i < ITERATIONS; i++) {
+        uint32_t rand_x = rand() % w;
+        uint32_t rand_y = rand() % h;
+
+        // check if rect'ed already
+        // expand rect
+        int32_t val = buf32[rand_y*w + rand_x];
+
+        if ((val != +1) && (val != -1))
+            continue; // already rect'ed
+
+        // expansion algorithm
+        bool expanded = false;
+
+        bool left_end = false;
+        bool right_end = false;
+        bool top_end = false;
+        bool bottom_end = false;
+
+        STLrect valrect;
+        valrect.left = rand_x;
+        valrect.right = rand_x;
+        valrect.top = rand_y;
+        valrect.bottom = rand_y;
+        if (val==+1)
+            valrect.tag =  tag_cnt;
+        else
+            valrect.tag =  -tag_cnt;
+
+        int index;
+
+        while(!left_end || !right_end || !top_end || !bottom_end) {
+
+            if (!left_end)
+                if (valrect.left==0)
+                    left_end = true;
+                else {
+                    index = (valrect.top*w) + (valrect.left-1);
+                    for (j=valrect.top; j<=valrect.bottom; j++) {
+                        if (buf32[index]!=val)
+                            break;
+                        index += w;
+                    }
+                    if (j<=valrect.bottom) { // failed
+                        left_end = true;
+                    }
+                    else {
+                        valrect.left--;
+                        expanded =  true;
+                    }
+                }
+
+            if (!top_end)
+                if (valrect.top==0)
+                    top_end = true;
+                else {
+                    index = ((valrect.top-1)*w) + (valrect.left);
+                    for (k=valrect.left; k<=valrect.right; k++) {
+                        if (buf32[index]!=val)
+                            break;
+                        index += 1;
+                    }
+                    if (k<=valrect.right) { // failed
+                        top_end = true;
+                    }
+                    else {
+                        valrect.top--;
+                        expanded =  true;
+                    }
+                }
+
+            if (!right_end)
+                if (valrect.right==w-1)
+                    right_end = true;
+                else {
+                    index = (valrect.top*w) + (valrect.right+1);
+                    for (j=valrect.top; j<=valrect.bottom; j++) {
+                        if (buf32[index]!=val)
+                            break;
+                        index += w;
+                    }
+                    if (j<=valrect.bottom) { // failed
+                        right_end = true;
+                    }
+                    else {
+                        valrect.right++;
+                        expanded =  true;
+                    }
+                }
+
+            if (!bottom_end)
+                if (valrect.bottom==h-1)
+                    bottom_end = true;
+                else {
+                    index = ((valrect.bottom+1)*w) + (valrect.left);
+                    for (k=valrect.left; k<=valrect.right; k++) {
+                        if (buf32[index]!=val)
+                            break;
+                        index += 1;
+                    }
+                    if (k<=valrect.right) { // failed
+                        bottom_end = true;
+                    }
+                    else {
+                        valrect.bottom++;
+                        expanded =  true;
+                    }
+                }
+        }
+
+        if (expanded) {
+            if (val==-1) {
+                body_rects.push_back(valrect);
+            }
+            if (val==+1) {
+                glyph_rects.push_back(valrect);
+            }
+
+            buf32 = tag_bitmap_i32;
+            buf32 += (valrect.top*w);
+            for (j=valrect.top; j<=valrect.bottom; j++) {
+                for (k=valrect.left; k<=valrect.right; k++) {
+                    buf32[k] = valrect.tag;
+                }
+                buf32 += w;
+            }
+            buf32 = tag_bitmap_i32;
+
+
+            tag_cnt++;
+        }
+    }
+
+    /////////////////////////////////////////////////
+
     std::ofstream stl_out(filename, std::ios::binary);
     if (!stl_out.is_open()) {
         std::cerr << "ERROR: Could not open STL file for writing." << std::endl;
@@ -358,6 +523,7 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
     // cube corners: upper/lower;top/botton;left/right
     pos3d_t utl, utr, ubl, ubr, ltl, ltr, lbl, lbr;
 
+    // SINGLE PIXELS
     for (y = 0; y < bm_height; y++) {
         for (x = 0; x < bm_width; x++) {
 
@@ -372,43 +538,77 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
             lbl = (pos3d_t){RS * x, -RS * (y + 1), 0};
             lbr = (pos3d_t){RS * (x + 1), -RS * (y + 1), 0};
 
-            if (buf[y * w + x]) {
-
+            // single pixel upper faces (glyph)
+            if (buf32[y * w + x] == +1) {
                 // upper face
                 STL_triangle_write(stl_out, Zp, utr, utl, ubl, tri_cnt);
                 STL_triangle_write(stl_out, Zp, utr, ubl, ubr, tri_cnt);
+            }
+
+            // single pixel upper faces (body / no glyph)
+            if (buf32[y * w + x] == -1) {
+                // lower faces become upper faces of body for 0
+                STL_triangle_write(stl_out, Zp, ltr, lbl, ltl, tri_cnt);
+                STL_triangle_write(stl_out, Zp, ltr, lbr, lbl, tri_cnt);
+            }
+
+            // side walls of glyph
+            if (buf32[y * w + x] > 0) {
+                
 
                 // left face
-                if ((x == 0) || (buf[((y)*w) + (x - 1)] == 0)) {
+                if ((x == 0) || (buf32[((y)*w) + (x - 1)] < 0)) {
                     STL_triangle_write(stl_out, Xn, ubl, utl, ltl, tri_cnt);
                     STL_triangle_write(stl_out, Xn, ubl, ltl, lbl, tri_cnt);
                 }
 
                 // right face
-                if ((x == (bm_width - 1)) || (buf[((y)*w) + (x + 1)] == 0)) {
+                if ((x == (bm_width - 1)) || (buf32[((y)*w) + (x + 1)] < 0)) {
                     STL_triangle_write(stl_out, Xp, ubr, ltr, utr, tri_cnt);
                     STL_triangle_write(stl_out, Xp, ubr, lbr, ltr, tri_cnt);
                 }
 
                 // top face
-                if ((y == 0) || (buf[((y - 1) * w) + (x)] == 0)) {
+                if ((y == 0) || (buf32[((y - 1) * w) + (x)] < 0)) {
                     STL_triangle_write(stl_out, Yp, utl, utr, ltr, tri_cnt);
                     STL_triangle_write(stl_out, Yp, utl, ltr, ltl, tri_cnt);
                 }
 
                 // bottom face
-                if ((y == (bm_height - 1)) || (buf[((y + 1) * w) + (x)] == 0)) {
+                if ((y == (bm_height - 1)) || (buf32[((y + 1) * w) + (x)] < 0)) {
                     STL_triangle_write(stl_out, Yn, ubl, lbr, ubr, tri_cnt);
                     STL_triangle_write(stl_out, Yn, ubl, lbl, lbr, tri_cnt);
                 }
             }
-            else {
-                // lower faces become upper faces of body for 0
-                STL_triangle_write(stl_out, Zp, ltr, lbl, ltl, tri_cnt);
-                STL_triangle_write(stl_out, Zp, ltr, lbr, lbl, tri_cnt);
-            }
         }
     }
+
+    // LARGE RECTS 
+    for (i = 0; i < glyph_rects.size(); i++) {
+            STLrect R = glyph_rects[i];
+            utl = (pos3d_t){RS * R.left, -RS * R.top, DOD};
+            utr = (pos3d_t){RS * (R.right + 1), -RS * R.top, DOD};
+            ubl = (pos3d_t){RS * R.left, -RS * (R.bottom + 1), DOD};
+            ubr = (pos3d_t){RS * (R.right + 1), -RS * (R.bottom + 1), DOD};
+
+            STL_triangle_write(stl_out, Zp, utr, utl, ubl, tri_cnt);
+            STL_triangle_write(stl_out, Zp, utr, ubl, ubr, tri_cnt);
+    }
+
+    for (i = 0; i < body_rects.size(); i++) {
+            STLrect R = body_rects[i];
+
+            ltl = (pos3d_t){RS * R.left, -RS * R.top, 0};
+            ltr = (pos3d_t){RS * (R.right + 1), -RS * R.top, 0};
+            lbl = (pos3d_t){RS * R.left, -RS * (R.bottom + 1), 0};
+            lbr = (pos3d_t){RS * (R.right + 1), -RS * (R.bottom + 1), 0};
+
+            STL_triangle_write(stl_out, Zp, ltr, lbl, ltl, tri_cnt);
+            STL_triangle_write(stl_out, Zp, ltr, lbr, lbl, tri_cnt);
+    }
+
+
+    // BODY
 
     // type body cube corners - assuming cube goes down from Z=0 to Z=-(type height - depth of drive)
 
@@ -544,6 +744,16 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
     stl_out.seekp(80);
     stl_out.write((const char*)&tri_cnt, 4);
     stl_out.close();
+
+    /////////// New optimizer code //////////////////
+
+
+
+    if (tag_bitmap_i32 != NULL)
+        free(tag_bitmap_i32);
+    tag_bitmap_i32 = NULL;
+
+    /////////////////////////////////////////////////
 
     std::cout << "Wrote binary STL data to " << filename << std::endl;
     std::cout << "---------------------" << std::endl;
