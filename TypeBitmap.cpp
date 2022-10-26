@@ -450,6 +450,15 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
 
     float RS = raster_size.as_mm();
     float DOD = UVstretchZ*depth_of_drive.as_mm();
+
+    /*
+const float layer_height = 0.050;
+const int max_pix_layers = 4;
+float PS = max_pix_layers * layer_height; // maximum pixel step
+DOD = (int(DOD / PS)) * PS; // rounded down to pixel step
+int num_pixel_steps = int(DOD / PS);
+*/
+
     float BH = UVstretchZ*(type_height.as_mm()) - DOD; // Body height in mm
 
     float FZ;
@@ -611,6 +620,20 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
                         expanded =  true;
                     }
                 }
+/*
+            // overstretch check
+            uint32_t ext_width = valrect.right-valrect.left+1;
+            uint32_t ext_height = valrect.bottom-valrect.top+1;
+            const int MAX_RECT_STRETCH = 2;
+            if ((ext_width>2) && (ext_width>2)) {
+                if ((ext_width*MAX_RECT_STRETCH < ext_height) || (ext_height*MAX_RECT_STRETCH < ext_width)) {
+                    top_end = true;
+                    bottom_end = true;
+                    left_end = true;
+                    right_end = true;
+                } 
+            }
+            */
         }
 
         if (expanded) {
@@ -712,44 +735,63 @@ int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, di
                 //STL_triangle_write(stl_out, Zp, ltr, lbr, lbl, tri_cnt);
             }
 
-            // side walls of glyph
-            if (buf32[y * w + x] > 0) {
-                
+            
+/*
+            for(k=0; k<num_pixel_steps; k++) {
 
-                // left face
-                if ((x == 0) || (buf32[((y)*w) + (x - 1)] < 0)) {
-                    STL_rect_write(stl_out, Xn, ubl, utl, ltl, lbl, tri_cnt);
-                    //STL_triangle_write(stl_out, Xn, ubl, utl, ltl, tri_cnt);
-                    //STL_triangle_write(stl_out, Xn, ubl, ltl, lbl, tri_cnt);
-                }
+                utl = (pos3d_t){RS * x, -RS * y, (k+1)*PS};
+                utr = (pos3d_t){RS * (x + 1), -RS * y, (k+1)*PS};
+                ubl = (pos3d_t){RS * x, -RS * (y + 1), (k+1)*PS};
+                ubr = (pos3d_t){RS * (x + 1), -RS * (y + 1), (k+1)*PS};
 
-                // right face
-                if ((x == (bm_width - 1)) || (buf32[((y)*w) + (x + 1)] < 0)) {
-                    STL_rect_write(stl_out, Xp, ubr, ltr, utr, lbr, tri_cnt);
-                    //STL_triangle_write(stl_out, Xp, ubr, ltr, utr, tri_cnt);
-                    //STL_triangle_write(stl_out, Xp, ubr, lbr, ltr, tri_cnt);
-                }
+                ltl = (pos3d_t){RS * x, -RS * y, k*PS};
+                ltr = (pos3d_t){RS * (x + 1), -RS * y, k*PS};
+                lbl = (pos3d_t){RS * x, -RS * (y + 1), k*PS};
+                lbr = (pos3d_t){RS * (x + 1), -RS * (y + 1), k*PS};
+*/
+                // side walls of glyph
+                if (buf32[y * w + x] > 0) {
+                    
 
-                // top face
-                if ((y == 0) || (buf32[((y - 1) * w) + (x)] < 0)) {
-                    STL_rect_write(stl_out, Yp, utl, utr, ltr, ltl, tri_cnt);
-                    //STL_triangle_write(stl_out, Yp, utl, utr, ltr, tri_cnt);
-                    //STL_triangle_write(stl_out, Yp, utl, ltr, ltl, tri_cnt);
-                }
+                    // left face
+                    if ((x == 0) || (buf32[((y)*w) + (x - 1)] < 0)) {
+                        STL_rect_write(stl_out, Xn, ubl, utl, ltl, lbl, tri_cnt);
+                        //STL_triangle_write(stl_out, Xn, ubl, utl, ltl, tri_cnt);
+                        //STL_triangle_write(stl_out, Xn, ubl, ltl, lbl, tri_cnt);
+                    }
 
-                // bottom face
-                if ((y == (bm_height - 1)) || (buf32[((y + 1) * w) + (x)] < 0)) {
-                    STL_rect_write(stl_out, Yn, ubl, lbr, ubr, lbl, tri_cnt);
-                    //STL_triangle_write(stl_out, Yn, ubl, lbr, ubr, tri_cnt);
-                    //STL_triangle_write(stl_out, Yn, ubl, lbl, lbr, tri_cnt);
+                    // right face
+                    if ((x == (bm_width - 1)) || (buf32[((y)*w) + (x + 1)] < 0)) {
+                        STL_rect_write(stl_out, Xp, ubr, ltr, utr, lbr, tri_cnt);
+                        //STL_triangle_write(stl_out, Xp, ubr, ltr, utr, tri_cnt);
+                        //STL_triangle_write(stl_out, Xp, ubr, lbr, ltr, tri_cnt);
+                    }
+
+                    // top face
+                    if ((y == 0) || (buf32[((y - 1) * w) + (x)] < 0)) {
+                        STL_rect_write(stl_out, Yp, utl, utr, ltr, ltl, tri_cnt);
+                        //STL_triangle_write(stl_out, Yp, utl, utr, ltr, tri_cnt);
+                        //STL_triangle_write(stl_out, Yp, utl, ltr, ltl, tri_cnt);
+                    }
+
+                    // bottom face
+                    if ((y == (bm_height - 1)) || (buf32[((y + 1) * w) + (x)] < 0)) {
+                        STL_rect_write(stl_out, Yn, ubl, lbr, ubr, lbl, tri_cnt);
+                        //STL_triangle_write(stl_out, Yn, ubl, lbr, ubr, tri_cnt);
+                        //STL_triangle_write(stl_out, Yn, ubl, lbl, lbr, tri_cnt);
+                    }
                 }
+/*
             }
+*/
+
         }
     }
 
     // LARGE RECTS 
     for (i = 0; i < glyph_rects.size(); i++) {
             STLrect R = glyph_rects[i];
+
             utl = (pos3d_t){RS * R.left, -RS * R.top, DOD};
             utr = (pos3d_t){RS * (R.right + 1), -RS * R.top, DOD};
             ubl = (pos3d_t){RS * R.left, -RS * (R.bottom + 1), DOD};
