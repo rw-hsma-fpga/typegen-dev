@@ -35,6 +35,11 @@ struct pos3d_t {
     float x, y, z;
 };
 
+struct intvec3d_t {
+    int32_t x, y, z;
+};
+
+
 
 //struct stl_binary_triangle
 struct stl_tri_t {

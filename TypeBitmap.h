@@ -16,13 +16,20 @@ class TypeBitmap {
 
     // for optimized STL conversion
     int32_t *tag_bitmap_i32;
+
     struct STLrect {
-        uint32_t top, left, bottom, right;
+        int32_t top, left, bottom, right;
         int32_t tag;
     };
     std::vector<STLrect> glyph_rects;
     std::vector<STLrect> body_rects;
 
+    // for optimized OBJ conversion
+    struct OBJtriangle {
+        uint32_t v1, v2, v3; // vertex indices
+    };
+    std::vector<intvec3d_t> vertices;
+    std::vector<OBJtriangle> triangles;
 
     dim_t type_height;
     dim_t depth_of_drive;
@@ -34,9 +41,15 @@ class TypeBitmap {
                                    pos3d_t v1, pos3d_t v2, pos3d_t v3,
                                    uint32_t &count);
 
-    inline void STL_rect_write(std::ofstream &outfile, pos3d_t N,
+    void STL_rect_write(std::ofstream &outfile, pos3d_t N,
                                    pos3d_t v1, pos3d_t v2, pos3d_t v3, pos3d_t v4,
                                    uint32_t &count);
+
+    void OBJ_rect_push(intvec3d_t N,
+                       intvec3d_t v1, intvec3d_t v2,
+                       intvec3d_t v3, intvec3d_t v4);
+
+    uint32_t find_or_add_vertex(intvec3d_t v);
 
 
     public:

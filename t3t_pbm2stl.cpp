@@ -78,11 +78,11 @@ int main(int ac, char* av[])
         TBM->export_STL(stl_path, argsopts.foot_mode,
                         argsopts.reduced_foot_XY, argsopts.reduced_foot_Z,
                         UVstretchZ);
-/*
+
         TBM->export_OBJ(obj_path, argsopts.foot_mode,
                         argsopts.reduced_foot_XY, argsopts.reduced_foot_Z,
                         UVstretchZ);
-                        */
+                        
 
      
                                         
