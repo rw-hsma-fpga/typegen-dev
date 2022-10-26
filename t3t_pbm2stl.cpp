@@ -24,6 +24,7 @@ struct {
 
     std::string pbm_path;
     std::string stl_path;
+    std::string obj_path;
 
     std::vector<uint32_t> characters;
 
@@ -47,13 +48,15 @@ int main(int ac, char* av[])
 
         uint32_t current_char = argsopts.characters[i];
 
-        std::string pbm_path, stl_path;
+        std::string pbm_path, stl_path, obj_path;
         if (current_char < 0x80) {
             char asciistring[6];
             sprintf(asciistring,"%c.pbm",current_char);
             pbm_path = std::string(asciistring);
             sprintf(asciistring,"%c.stl",current_char);
             stl_path = std::string(asciistring);
+            sprintf(asciistring,"%c.obj",current_char);
+            obj_path = std::string(asciistring);
         }
         else {
             char hexstring[11];
@@ -61,6 +64,8 @@ int main(int ac, char* av[])
             pbm_path = std::string(hexstring);
             sprintf(hexstring,"U+%04x.stl",current_char);
             stl_path = std::string(hexstring);
+            sprintf(hexstring,"U+%04x.obj",current_char);
+            obj_path = std::string(hexstring);
         }
 
         TypeBitmap *TBM = new TypeBitmap();
@@ -73,7 +78,12 @@ int main(int ac, char* av[])
         TBM->export_STL(stl_path, argsopts.foot_mode,
                         argsopts.reduced_foot_XY, argsopts.reduced_foot_Z,
                         UVstretchZ);
-     
+/*
+        TBM->export_OBJ(obj_path, argsopts.foot_mode,
+                        argsopts.reduced_foot_XY, argsopts.reduced_foot_Z,
+                        UVstretchZ);
+                        */
+
      
                                         
     }
@@ -103,6 +113,7 @@ int parse_options(int ac, char* av[])
             ("help", "produce this help message")
             ("pbm,p", bpo::value<std::string>(&argsopts.pbm_path), "specify input PBM path")
             ("stl,s", bpo::value<std::string>(&argsopts.stl_path), "specify output STL path")
+            ("obj,o", bpo::value<std::string>(&argsopts.obj_path), "specify output OBJ path")
             ("yaml,y", bpo::value< vector<string> >(&yaml_paths), "specify YAML configuration file(s)")
         ;
 

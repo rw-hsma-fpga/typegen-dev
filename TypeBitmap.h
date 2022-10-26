@@ -59,6 +59,9 @@ class TypeBitmap {
 
         int export_STL(std::string filename, reduced_foot_mode foot_mode,
                        dim_t footXY, dim_t footZ, float UVstretchZ);
+        int export_OBJ(std::string filename, reduced_foot_mode foot_mode,
+                       dim_t footXY, dim_t footZ, float UVstretchZ);
+
 };
 
 #endif // TYPEBITMAP_H
