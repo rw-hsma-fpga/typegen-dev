@@ -37,7 +37,7 @@ struct {
 
     float XYshrink_pct;
 
-} argsopts = { .XYshrink_pct = 0 };
+} opts = { .XYshrink_pct = 0 };
 
 
 int parse_options(int ac, char* av[]);
@@ -48,7 +48,7 @@ int main(int ac, char* av[])
 {
     parse_options(ac, av);
 
-    float UVstretchXY = (float)100 / ((float)100 + argsopts.XYshrink_pct);
+    float UVstretchXY = (float)100 / ((float)100 + opts.XYshrink_pct);
     cout << "XY stretch to compensate UV shrinking: " << UVstretchXY << endl;
 
     FT_Library library;
@@ -56,12 +56,12 @@ int main(int ac, char* av[])
     FT_GlyphSlot slot;
     FT_Error error;
 
-    if (argsopts.font_path.empty()) {
+    if (opts.font_path.empty()) {
         std::cerr << "ERROR: No font file specified." << std::endl;
         exit(1);
     }
 
-    if (argsopts.characters.empty()) {
+    if (opts.characters.empty()) {
         std::cerr << "ERROR: No characters oder unicodes specified." << std::endl;
         exit(1);
     }
@@ -72,15 +72,15 @@ int main(int ac, char* av[])
         exit(1);
     }
 
-    error = FT_New_Face(library, argsopts.font_path.c_str(), 0, &face); /* create face object */
+    error = FT_New_Face(library, opts.font_path.c_str(), 0, &face); /* create face object */
     if (error) {
         std::cout << "Error: FT_New_Face() failed with error " << error << std::endl;
         exit(1);
     }
 
 
-    float dpi = (1 / (argsopts.raster_size.as_inch() / UVstretchXY )); /// UVstretchXY
-    int ptsize =  round(argsopts.body_size.as_pt());
+    float dpi = (1 / (opts.raster_size.as_inch() / UVstretchXY )); /// UVstretchXY
+    int ptsize =  round(opts.body_size.as_pt());
 
     error = FT_Set_Char_Size(face, ptsize << 6, 0, int(round(dpi)), 0); /* set char size */
     if (error) {
@@ -89,13 +89,13 @@ int main(int ac, char* av[])
     }
     slot = face->glyph;
     /* load glyph image into the slot (erase previous one) */
-    error = FT_Load_Char(face, argsopts.ref_char[0], FT_LOAD_RENDER);
+    error = FT_Load_Char(face, opts.ref_char[0], FT_LOAD_RENDER);
     if (error) {
         std::cout << "Error: FT_Load_Char() failed with error " << error << std::endl;
         exit(1);
     }
 
-    float body_size_px = argsopts.body_size.as_inch() * dpi;
+    float body_size_px = opts.body_size.as_inch() * dpi;
 
     // metrics for ttf reference glyph at intended dpi
     int glyph_width_px = slot->bitmap.width;
@@ -105,9 +105,9 @@ int main(int ac, char* av[])
 
 
     // SCALE CORRECTION
-    dim_t lead_glyph_height(argsopts.body_size.as_mm()
-                            - argsopts.above_ref_char.as_mm()
-                            - argsopts.below_ref_char.as_mm(),mm);
+    dim_t lead_glyph_height(opts.body_size.as_mm()
+                            - opts.above_ref_char.as_mm()
+                            - opts.below_ref_char.as_mm(),mm);
     dim_t truetype_glyph_height(glyph_height_px / dpi, inch);
 
     float ttf_to_lead_scaleup = lead_glyph_height.as_mm() / truetype_glyph_height.as_mm();
@@ -116,7 +116,7 @@ int main(int ac, char* av[])
     float upscaled_ascender_px = refchar_ascender_px * ttf_to_lead_scaleup;
     
     int scaledup_dpi = int(round(dpi * ttf_to_lead_scaleup));
-    int typetop_to_baseline_px = int(round( upscaled_ascender_px +(argsopts.above_ref_char.as_inch() * dpi) ) );
+    int typetop_to_baseline_px = int(round( upscaled_ascender_px +(opts.above_ref_char.as_inch() * dpi) ) );
 
     printf("Glyph height in lead (mm): %f\r\n", lead_glyph_height.as_mm());
     printf("Glyph height in TrueType (mm): %f\r\n", truetype_glyph_height.as_mm());
@@ -135,9 +135,9 @@ int main(int ac, char* av[])
 
 
 
-    for(int i=0; i<argsopts.characters.size(); i++) {
+    for(int i=0; i<opts.characters.size(); i++) {
 
-        uint32_t current_char = argsopts.characters[i];
+        uint32_t current_char = opts.characters[i];
         error = FT_Load_Char(face, current_char, FT_LOAD_RENDER);
         if (error) {
             std::cout << "Error: FT_Load_Char() failed with error " << error << std::endl;
@@ -178,7 +178,7 @@ int main(int ac, char* av[])
         }
         TBM.store(output_path);
             
-        //TBM.store(argsopts.pbm_path);
+        //TBM.store(opts.pbm_path);
     }
 
     FT_Done_Face(face);
@@ -210,8 +210,8 @@ int parse_options(int ac, char* av[])
         bpo::options_description desc("t3t_pbm2stl: Command-line options and arguments");
         desc.add_options()
             ("help", "produce this help message")
-            ("pbm,p", bpo::value<std::string>(&argsopts.pbm_path), "specify output PBM path")
-            //("font,f", bpo::value<std::string>(&argsopts.font_path), "specify input font path")
+            ("pbm,p", bpo::value<std::string>(&opts.pbm_path), "specify output PBM path")
+            //("font,f", bpo::value<std::string>(&opts.font_path), "specify input font path")
             ("yaml,y", bpo::value< vector<string> >(&yaml_paths), "specify YAML configuration file(s)")
         ;
 
@@ -253,32 +253,39 @@ int parse_options(int ac, char* av[])
 
         YAML::Node config = YAML::Load(yaml_config);
 
-        get_yaml_dim_node(config, "raster size", argsopts.raster_size);
-        get_yaml_dim_node(config, "body size", argsopts.body_size);
-        get_yaml_dim_node(config, "space above refchar", argsopts.above_ref_char);
-        get_yaml_dim_node(config, "space below refchar", argsopts.below_ref_char);
+        get_yaml_dim_node(config, "raster size", opts.raster_size);
+        get_yaml_dim_node(config, "body size", opts.body_size);
+        get_yaml_dim_node(config, "space above refchar", opts.above_ref_char);
+        get_yaml_dim_node(config, "space below refchar", opts.below_ref_char);
 
         if (config["font file"]) {
-            argsopts.font_path = config["font file"].as<std::string>();
+            opts.font_path = config["font file"].as<std::string>();
         }
 
         if (config["reference character"]) {
-            argsopts.ref_char = config["reference character"].as<std::string>();
+            opts.ref_char = config["reference character"].as<std::string>();
         }
 
         if (config["characters"]) {
-            std::string characters = config["characters"].as<std::string>();
-            for(int i=0; i< characters.size(); i++)
-                argsopts.characters.push_back((uint32_t)characters[i]);
-        }
+cout << "e1" << endl;            
+            YAML::Node chars = config["characters"];
+cout << "e2" << endl;            
 
-        if (config["unicode"]) {
-            for(int i=0; i<  config["unicode"].size(); i++)
-                argsopts.characters.push_back((uint32_t)config["unicode"][i].as<int>());
+            if (chars["ASCII"]) {
+                std::string characters = chars["ASCII"].as<std::string>();
+                for(int i=0; i< characters.size(); i++)
+                    opts.characters.push_back((uint32_t)characters[i]);
+            }
+cout << "e3" << endl;            
+
+            if (chars["unicode"]) {
+                for(int i=0; i<  chars["unicode"].size(); i++)
+                    opts.characters.push_back((uint32_t)chars["unicode"][i].as<int>());
+            }
         }
 
         if (config["XYshrink_pct"]) {
-            argsopts.XYshrink_pct = config["XYshrink_pct"].as<float>();
+            opts.XYshrink_pct = config["XYshrink_pct"].as<float>();
         }
 
     }

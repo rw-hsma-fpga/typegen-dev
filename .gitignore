@@ -1,8 +1,10 @@
 *
 !*.c
 !*.cpp
-!*.h
+!include/*.h
 !*.sh
 !*.yaml
 !.gitignore
+!**/CMakeLists.txt
+
 

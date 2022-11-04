@@ -30,7 +30,7 @@ struct {
 
     float Zshrink_pct;
 
-} argsopts = { .foot_mode = none, .Zshrink_pct = 0 };
+} opts = { .foot_mode = none, .Zshrink_pct = 0 };
 
 
 int parse_options(int ac, char* av[]);
@@ -41,12 +41,12 @@ int main(int ac, char* av[])
 {
     parse_options(ac, av);
 
-    float UVstretchZ = (float)100 / ((float)100 + argsopts.Zshrink_pct);
+    float UVstretchZ = (float)100 / ((float)100 + opts.Zshrink_pct);
     cout << "Z stretch to compensate UV shrinking: " << UVstretchZ << endl;
 
-    for(int i=0; i<argsopts.characters.size(); i++) {
+    for(int i=0; i<opts.characters.size(); i++) {
 
-        uint32_t current_char = argsopts.characters[i];
+        uint32_t current_char = opts.characters[i];
 
         std::string pbm_path, stl_path, obj_path;
         if (current_char < 0x80) {
@@ -69,18 +69,18 @@ int main(int ac, char* av[])
         }
 
         TypeBitmap *TBM = new TypeBitmap();
-        TBM->set_type_parameters(argsopts.type_height,
-                                argsopts.depth_of_drive,
-                                argsopts.raster_size,
-                                argsopts.layer_height);
+        TBM->set_type_parameters(opts.type_height,
+                                opts.depth_of_drive,
+                                opts.raster_size,
+                                opts.layer_height);
 
         TBM->load(pbm_path);
-        TBM->export_STL(stl_path, argsopts.foot_mode,
-                        argsopts.reduced_foot_XY, argsopts.reduced_foot_Z,
+        TBM->export_STL(stl_path, opts.foot_mode,
+                        opts.reduced_foot_XY, opts.reduced_foot_Z,
                         UVstretchZ);
 
-        TBM->export_OBJ(obj_path, argsopts.foot_mode,
-                        argsopts.reduced_foot_XY, argsopts.reduced_foot_Z,
+        TBM->export_OBJ(obj_path, opts.foot_mode,
+                        opts.reduced_foot_XY, opts.reduced_foot_Z,
                         UVstretchZ);
                         
 
@@ -111,9 +111,9 @@ int parse_options(int ac, char* av[])
         bpo::options_description desc("t3t_pbm2stl: Command-line options and arguments");
         desc.add_options()
             ("help", "produce this help message")
-            ("pbm,p", bpo::value<std::string>(&argsopts.pbm_path), "specify input PBM path")
-            ("stl,s", bpo::value<std::string>(&argsopts.stl_path), "specify output STL path")
-            ("obj,o", bpo::value<std::string>(&argsopts.obj_path), "specify output OBJ path")
+            ("pbm,p", bpo::value<std::string>(&opts.pbm_path), "specify input PBM path")
+            ("stl,s", bpo::value<std::string>(&opts.stl_path), "specify output STL path")
+            ("obj,o", bpo::value<std::string>(&opts.obj_path), "specify output OBJ path")
             ("yaml,y", bpo::value< vector<string> >(&yaml_paths), "specify YAML configuration file(s)")
         ;
 
@@ -138,11 +138,11 @@ int parse_options(int ac, char* av[])
         if (yaml_paths.empty() && std::filesystem::exists("config.yaml"))
             yaml_paths.push_back("config.yaml");
 
-        if (!argsopts.pbm_path.empty() && !argsopts.pbm_path.ends_with(".pbm"))
-            argsopts.pbm_path.append(".pbm");
+        if (!opts.pbm_path.empty() && !opts.pbm_path.ends_with(".pbm"))
+            opts.pbm_path.append(".pbm");
 
-        if (!argsopts.stl_path.empty() && !argsopts.stl_path.ends_with(".stl"))
-            argsopts.stl_path.append(".stl");
+        if (!opts.stl_path.empty() && !opts.stl_path.ends_with(".stl"))
+            opts.stl_path.append(".stl");
 
         string yaml_config;
 
@@ -162,36 +162,41 @@ int parse_options(int ac, char* av[])
 
         YAML::Node config = YAML::Load(yaml_config);
 
-        get_yaml_dim_node(config, "type height", argsopts.type_height);
-        get_yaml_dim_node(config, "depth of drive", argsopts.depth_of_drive);
-        get_yaml_dim_node(config, "raster size", argsopts.raster_size);
-        get_yaml_dim_node(config, "layer height", argsopts.layer_height);
-        get_yaml_dim_node(config, "reduced foot XY", argsopts.reduced_foot_XY);
-        get_yaml_dim_node(config, "reduced foot Z", argsopts.reduced_foot_Z);
+        get_yaml_dim_node(config, "type height", opts.type_height);
+        get_yaml_dim_node(config, "depth of drive", opts.depth_of_drive);
+        get_yaml_dim_node(config, "raster size", opts.raster_size);
+        get_yaml_dim_node(config, "layer height", opts.layer_height);
+        get_yaml_dim_node(config, "reduced foot XY", opts.reduced_foot_XY);
+        get_yaml_dim_node(config, "reduced foot Z", opts.reduced_foot_Z);
 
         if (config["reduced foot mode"]) {
             string foot_mode_str = config["reduced foot mode"].as<std::string>();
             if (foot_mode_str=="bevel")
-                argsopts.foot_mode = bevel;
+                opts.foot_mode = bevel;
             else if (foot_mode_str=="step")
-                argsopts.foot_mode = step;
+                opts.foot_mode = step;
             else
-                argsopts.foot_mode = none;
+                opts.foot_mode = none;
         }
 
         if (config["characters"]) {
-            std::string characters = config["characters"].as<std::string>();
-            for(int i=0; i< characters.size(); i++)
-                argsopts.characters.push_back((uint32_t)characters[i]);
+            YAML::Node chars = config["characters"];
+
+            if (chars["ASCII"]) {
+                std::string characters = chars["ASCII"].as<std::string>();
+                for(int i=0; i< characters.size(); i++)
+                    opts.characters.push_back((uint32_t)characters[i]);
+            }
+
+            if (chars["unicode"]) {
+                for(int i=0; i<  chars["unicode"].size(); i++)
+                    opts.characters.push_back((uint32_t)chars["unicode"][i].as<int>());
+            }
         }
 
-        if (config["unicode"]) {
-            for(int i=0; i<  config["unicode"].size(); i++)
-                argsopts.characters.push_back((uint32_t)config["unicode"][i].as<int>());
-        }
 
         if (config["Zshrink_pct"]) {
-            argsopts.Zshrink_pct = config["Zshrink_pct"].as<float>();
+            opts.Zshrink_pct = config["Zshrink_pct"].as<float>();
         }
 
     }

@@ -1,5 +1,9 @@
 # font
-font file: TOSUBBL.ttf
+font file: fonts/TOSUBBL.ttf
+
+working directory:
+  path: ./ttc48/
+  create: true
 
 body size:
   value: 48
@@ -14,15 +18,12 @@ space below refchar:
   value: 1.00
   unit: mm
 
-characters: ABCDEFGHIJKLMNOPQRSTUVWXYZ.
-
-unicode:
+characters:
+  ASCII: ABCDEF #HIJKLMNOPQRSTUVWXYZ.
+  unicodes:
    - 0x2019
-#  - 0xEB # e: diakrit
-#  - 0xEC # i` gravis
+   # apostrophe used by the TTC
 
-# without U= for now
-#unicode: 0x45
 
 
 # font scaling mode and parameters
