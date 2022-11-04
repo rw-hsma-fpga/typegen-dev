@@ -8,6 +8,7 @@
 #include <sstream>
 
 using namespace std;
+namespace fs = std::filesystem;
 namespace bpo = boost::program_options;
 
 
@@ -25,12 +26,14 @@ struct {
     std::string pbm_path;
     std::string stl_path;
     std::string obj_path;
+    std::string work_path;
+        bool create_work_path;    
 
     std::vector<uint32_t> characters;
 
     float Zshrink_pct;
 
-} opts = { .foot_mode = none, .Zshrink_pct = 0 };
+} opts = { .foot_mode = none, .create_work_path = false, .Zshrink_pct = 0 };
 
 
 int parse_options(int ac, char* av[]);
@@ -44,28 +47,43 @@ int main(int ac, char* av[])
     float UVstretchZ = (float)100 / ((float)100 + opts.Zshrink_pct);
     cout << "Z stretch to compensate UV shrinking: " << UVstretchZ << endl;
 
+    if (!opts.work_path.empty()) {
+        if (!fs::exists(opts.work_path)) {
+            if (opts.create_work_path) {
+                if (!fs::create_directory(opts.work_path)) {
+                    cerr << "Creating work directory " << opts.work_path << " failed." << endl;
+                    exit(1);
+                }            
+            }
+            else {
+                cerr << "Specified work directory " << opts.work_path << " does not exist." << endl;
+                exit(1);
+            }
+        }
+    }
+    else {
+        opts.work_path = "./";
+    } 
+
+    // TODO command line override of character list on input/output
     for(int i=0; i<opts.characters.size(); i++) {
 
         uint32_t current_char = opts.characters[i];
 
         std::string pbm_path, stl_path, obj_path;
         if (current_char < 0x80) {
-            char asciistring[6];
-            sprintf(asciistring,"%c.pbm",current_char);
-            pbm_path = std::string(asciistring);
-            sprintf(asciistring,"%c.stl",current_char);
-            stl_path = std::string(asciistring);
-            sprintf(asciistring,"%c.obj",current_char);
-            obj_path = std::string(asciistring);
+            char asciistring[3];
+            sprintf(asciistring,"/%c",current_char);
+            pbm_path = opts.work_path + std::string(asciistring) + ".pbm";
+            stl_path = opts.work_path + std::string(asciistring) + ".stl";
+            obj_path = opts.work_path + std::string(asciistring) + ".obj";
         }
         else {
-            char hexstring[11];
-            sprintf(hexstring,"U+%04x.pbm",current_char);
-            pbm_path = std::string(hexstring);
-            sprintf(hexstring,"U+%04x.stl",current_char);
-            stl_path = std::string(hexstring);
-            sprintf(hexstring,"U+%04x.obj",current_char);
-            obj_path = std::string(hexstring);
+            char hexstring[8]; // TODO: 5-digit Unicode support?
+            sprintf(hexstring,"/U+%04x",current_char);
+            pbm_path = opts.work_path + std::string(hexstring) + ".pbm";
+            stl_path = opts.work_path + std::string(hexstring) + ".stl";
+            obj_path = opts.work_path + std::string(hexstring) + ".obj";
         }
 
         TypeBitmap *TBM = new TypeBitmap();
@@ -135,7 +153,7 @@ int parse_options(int ac, char* av[])
                 s.append(".yaml");
         }
 
-        if (yaml_paths.empty() && std::filesystem::exists("config.yaml"))
+        if (yaml_paths.empty() && fs::exists("config.yaml"))
             yaml_paths.push_back("config.yaml");
 
         if (!opts.pbm_path.empty() && !opts.pbm_path.ends_with(".pbm"))
@@ -147,7 +165,7 @@ int parse_options(int ac, char* av[])
         string yaml_config;
 
         for (string& s: yaml_paths) {
-            if (filesystem::exists(s)) {
+            if (fs::exists(s)) {
                     ifstream yfile(s);
                     while(!yfile.eof()) {
                         string buf;
@@ -179,6 +197,13 @@ int parse_options(int ac, char* av[])
                 opts.foot_mode = none;
         }
 
+        if (config["working directory"]) {
+            if (config["working directory"]["path"])
+                opts.work_path = config["working directory"]["path"].as<std::string>();
+            if (config["working directory"]["create"])
+                opts.create_work_path = config["working directory"]["create"].as<bool>();
+        }
+        
         if (config["characters"]) {
             YAML::Node chars = config["characters"];
 

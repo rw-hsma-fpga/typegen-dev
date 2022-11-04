@@ -2,7 +2,9 @@
 #include "t3t_support_types.h"
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 using namespace std;
+namespace fs = std::filesystem;
 
 
 struct STLfile {
@@ -12,11 +14,27 @@ struct STLfile {
     float highX, lowX, highY, lowY, highZ, lowZ;
 };
 
+std::string workdir;
 
 int main()
 {
 
     YAML::Node config = YAML::LoadFile("STLcompile.yaml");
+
+    if (config["working directory"]) {
+        if (config["working directory"]["path"])
+            workdir = config["working directory"]["path"].as<std::string>();
+    }
+
+    if (!workdir.empty()) {
+        if (!fs::exists(workdir)) {
+            cerr << "Specified work directory " << workdir << " does not exist." << endl;
+            exit(1);
+        }
+    }
+    else {
+        workdir = "./";
+    } 
 
     // TODO: Error checking
     float platformX = config["platform size X"].as<float>();
@@ -35,7 +53,8 @@ int main()
     STLfile inputSTL;
 
     // open output file
-    std::ofstream stl_out("compiled.stl", std::ios::binary);
+    std::string output_path = workdir + "/compiled.stl";
+    std::ofstream stl_out(output_path, std::ios::binary);
     if (!stl_out.is_open()) {
         std::cerr << "ERROR: Could not open STL file for writing." << std::endl;
         return -1;
@@ -80,7 +99,7 @@ int main()
         // line items
         for(int k=0; k<line.size(); k++) {
 
-            inputSTL.filename = line[k] + ".stl";
+            inputSTL.filename = workdir + "/" + line[k] + ".stl";
             ifstream stl_in(inputSTL.filename) ;
             if (!stl_in.is_open()) {
                 std::cerr << "ERROR: Could not open STL file for reading." << std::endl;

@@ -7,6 +7,7 @@
 #include <boost/program_options.hpp> 
 #include <sstream>
 using namespace std;
+namespace fs = std::filesystem;
 namespace bpo = boost::program_options;
 
 
@@ -27,8 +28,12 @@ const uint8_t BW_THRESHOLD = 1;
 struct {
     dim_t raster_size;
     dim_t body_size;
+
     std::string font_path;
     std::string pbm_path;
+    std::string work_path;
+        bool create_work_path;
+
     std::vector<uint32_t> characters;
 
     std::string ref_char;
@@ -37,7 +42,7 @@ struct {
 
     float XYshrink_pct;
 
-} opts = { .XYshrink_pct = 0 };
+} opts = { .create_work_path = false, .XYshrink_pct = 0 };
 
 
 int parse_options(int ac, char* av[]);
@@ -50,6 +55,25 @@ int main(int ac, char* av[])
 
     float UVstretchXY = (float)100 / ((float)100 + opts.XYshrink_pct);
     cout << "XY stretch to compensate UV shrinking: " << UVstretchXY << endl;
+
+    if (!opts.work_path.empty()) {
+        if (!fs::exists(opts.work_path)) {
+            if (opts.create_work_path) {
+                if (!fs::create_directory(opts.work_path)) {
+                    cerr << "Creating work directory " << opts.work_path << " failed." << endl;
+                    exit(1);
+                }            
+            }
+            else {
+                cerr << "Specified work directory " << opts.work_path << " does not exist." << endl;
+                exit(1);
+            }
+        }
+    }
+    else {
+        opts.work_path = "./";
+    } 
+
 
     FT_Library library;
     FT_Face face;
@@ -167,18 +191,17 @@ int main(int ac, char* av[])
         TBM.mirror();
         std::string output_path;
         if (current_char < 0x80) {
-            char asciistring[6];
-            sprintf(asciistring,"%c.pbm",current_char);
-            output_path = std::string(asciistring);
+            char asciistring[3];
+            sprintf(asciistring,"/%c",current_char);
+            output_path = opts.work_path + std::string(asciistring) + ".pbm";
         }
         else {
-            char hexstring[11];
-            sprintf(hexstring,"U+%04x.pbm",current_char);
-            output_path = std::string(hexstring);
+            char hexstring[8]; // TODO: 5-digit Unicode support?
+            sprintf(hexstring,"/U+%04x",current_char);
+            output_path = opts.work_path + std::string(hexstring) + ".pbm";
         }
         TBM.store(output_path);
             
-        //TBM.store(opts.pbm_path);
     }
 
     FT_Done_Face(face);
@@ -233,13 +256,13 @@ int parse_options(int ac, char* av[])
                 s.append(".yaml");
         }
 
-        if (yaml_paths.empty() && std::filesystem::exists("config.yaml"))
+        if (yaml_paths.empty() && fs::exists("config.yaml"))
             yaml_paths.push_back("config.yaml");
 
         string yaml_config;
 
         for (string& s: yaml_paths) {
-            if (filesystem::exists(s)) {
+            if (fs::exists(s)) {
                     ifstream yfile(s);
                     while(!yfile.eof()) {
                         string buf;
@@ -262,21 +285,25 @@ int parse_options(int ac, char* av[])
             opts.font_path = config["font file"].as<std::string>();
         }
 
+        if (config["working directory"]) {
+            if (config["working directory"]["path"])
+                opts.work_path = config["working directory"]["path"].as<std::string>();
+            if (config["working directory"]["create"])
+                opts.create_work_path = config["working directory"]["create"].as<bool>();
+        }
+
         if (config["reference character"]) {
             opts.ref_char = config["reference character"].as<std::string>();
         }
 
         if (config["characters"]) {
-cout << "e1" << endl;            
             YAML::Node chars = config["characters"];
-cout << "e2" << endl;            
 
             if (chars["ASCII"]) {
                 std::string characters = chars["ASCII"].as<std::string>();
                 for(int i=0; i< characters.size(); i++)
                     opts.characters.push_back((uint32_t)characters[i]);
             }
-cout << "e3" << endl;            
 
             if (chars["unicode"]) {
                 for(int i=0; i<  chars["unicode"].size(); i++)

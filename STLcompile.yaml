@@ -5,6 +5,11 @@ gap X: 4.0
 gap Y: 4.0
 
 
+working directory:
+  path: ./ttc48/
+  create: false # ignored by STLcompiler for now
+
+
 # Todo: Dimensions, left/right/top/bottom modes, break at line end options, etc.
 
 # rows
