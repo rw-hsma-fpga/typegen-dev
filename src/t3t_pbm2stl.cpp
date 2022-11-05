@@ -93,17 +93,13 @@ int main(int ac, char* av[])
                                 opts.layer_height);
 
         TBM->load(pbm_path);
-        TBM->export_STL(stl_path, opts.foot_mode,
+
+        TBM->generateMesh(opts.foot_mode,
                         opts.reduced_foot_XY, opts.reduced_foot_Z,
                         UVstretchZ);
 
-        TBM->export_OBJ(obj_path, opts.foot_mode,
-                        opts.reduced_foot_XY, opts.reduced_foot_Z,
-                        UVstretchZ);
-                        
-
-     
-                                        
+        TBM->writeOBJ(obj_path);
+        TBM->writeSTL(stl_path);
     }
     return 0;
 }

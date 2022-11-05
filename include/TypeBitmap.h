@@ -26,6 +26,7 @@ class TypeBitmap {
 
     // for optimized OBJ conversion
     struct OBJtriangle {
+        intvec3d_t N;
         uint32_t v1, v2, v3; // vertex indices
     };
     std::vector<intvec3d_t> vertices;
@@ -35,15 +36,6 @@ class TypeBitmap {
     dim_t depth_of_drive;
     dim_t raster_size;
     dim_t layer_height; // not really required here
-    // TODO: Fudge factor Z?
-
-    inline void STL_triangle_write(std::ofstream &outfile, pos3d_t N,
-                                   pos3d_t v1, pos3d_t v2, pos3d_t v3,
-                                   uint32_t &count);
-
-    void STL_rect_write(std::ofstream &outfile, pos3d_t N,
-                                   pos3d_t v1, pos3d_t v2, pos3d_t v3, pos3d_t v4,
-                                   uint32_t &count);
 
     void OBJ_rect_push(intvec3d_t N,
                        intvec3d_t v1, intvec3d_t v2,
@@ -70,10 +62,9 @@ class TypeBitmap {
 
         int set_type_parameters(dim_t TH, dim_t DOD, dim_t RS, dim_t LH);
 
-        int export_STL(std::string filename, reduced_foot_mode foot_mode,
-                       dim_t footXY, dim_t footZ, float UVstretchZ);
-        int export_OBJ(std::string filename, reduced_foot_mode foot_mode,
-                       dim_t footXY, dim_t footZ, float UVstretchZ);
+        int generateMesh(reduced_foot_mode foot_mode, dim_t footXY, dim_t footZ, float UVstretchZ);
+        int writeOBJ(std::string filename);
+        int writeSTL(std::string filename);
 
 };
 

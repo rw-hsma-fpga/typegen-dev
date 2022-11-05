@@ -288,586 +288,6 @@ int TypeBitmap::set_type_parameters(dim_t TH, dim_t DOD, dim_t RS, dim_t LH)
 }
 
 
-inline void TypeBitmap::STL_triangle_write(std::ofstream &outfile, pos3d_t N, pos3d_t v1, pos3d_t v2, pos3d_t v3, uint32_t &count)
-{
-    stl_tri_t TRI = (stl_tri_t)
-                    {N.x, N.y, N.z, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, 0};
-    outfile.write((const char*)&TRI, 50);
-    count++;
-}
-
-
-void TypeBitmap::STL_rect_write(std::ofstream &outfile, pos3d_t N, pos3d_t v1, pos3d_t v2, pos3d_t v3, pos3d_t v4, uint32_t &count)
-{
-    // TODO: Only works for normal vectors with only one non-0 component so far! Do real projection later
-    float twoPi = 8*atan(1);
-
-    struct prj2d_t {
-        pos3d_t *vert3d;
-        float px;
-        float py;
-        float angle;
-        uint8_t pos;
-    };
-
-    prj2d_t proj[4];
-    proj[0].vert3d = &v1;
-    proj[0].pos = 0;
-
-    proj[1].vert3d = &v2;
-    proj[1].pos = 1;
-
-    proj[2].vert3d = &v3;
-    proj[2].pos = 2;
-
-    proj[3].vert3d = &v4;
-    proj[3].pos = 3;
-
-    for (int i=0; i<4; i++) {
-        if (N.z > 0) {
-            proj[i].px = + proj[i].vert3d->x;
-            proj[i].py = + proj[i].vert3d->y;
-            continue;
-        }
-        if (N.z < 0) { // could also swap y instead I think
-            proj[i].px = - proj[i].vert3d->x;
-            proj[i].py = + proj[i].vert3d->y;
-            continue;
-        }
-        if (N.y > 0) {
-            proj[i].px = + proj[i].vert3d->x;
-            proj[i].py = - proj[i].vert3d->z;
-            continue;
-        }
-        if (N.y < 0) {
-            proj[i].px = + proj[i].vert3d->x;
-            proj[i].py = + proj[i].vert3d->z;
-            continue;
-        }
-        if (N.x > 0) {
-            proj[i].px = - proj[i].vert3d->z;
-            proj[i].py = + proj[i].vert3d->y;
-            continue;
-        }
-        if (N.x < 0) {
-            proj[i].px = + proj[i].vert3d->z;
-            proj[i].py = + proj[i].vert3d->y;
-            continue;
-        }
-    }
-
-    float center_x = (proj[0].px + proj[1].px + proj[2].px + proj[3].px) / 4;
-    float center_y = (proj[0].py + proj[1].py + proj[2].py + proj[3].py) / 4;
-
-    for (int i=0; i<4; i++) {
-        float deltax = proj[i].px - center_x;
-        float deltay = proj[i].py - center_y;
-        float norm = sqrt(deltax*deltax + deltay*deltay);
-        deltax /= norm;
-        //deltay /= norm; // abs value not used
-        float ang = acos(deltax);
-        if (deltay < 0)
-        
-            ang = twoPi - ang; // 0..2pi position at this point
-
-        proj[i].angle = ang;
-        if (i!=0) {
-            if (proj[i].angle < proj[0].angle)
-                proj[i].angle += twoPi;
-        }
-        
-    }
-
-    // bubble sort 1..3
-    uint8_t swap_pos;
-    float swap_angle;
-    pos3d_t *swap_vert3d;
-
-    for (int i=0; i<3; i++) {
-        int j = (i % 2)+1; // 1-2,2-3,1-2,done
-        if (proj[j].angle > proj[j+1].angle) {
-            swap_pos    = proj[j].pos;
-            swap_angle  = proj[j].angle;
-            swap_vert3d = proj[j].vert3d;
-            proj[j].pos    = proj[j+1].pos;
-            proj[j].angle  = proj[j+1].angle;
-            proj[j].vert3d = proj[j+1].vert3d;
-            proj[j+1].pos    = swap_pos;
-            proj[j+1].angle  = swap_angle;
-            proj[j+1].vert3d = swap_vert3d;
-        }
-    }
-
-    stl_tri_t TRI;
-    TRI = (stl_tri_t) {N.x, N.y, N.z,
-                       proj[0].vert3d->x, proj[0].vert3d->y, proj[0].vert3d->z,
-                       proj[1].vert3d->x, proj[1].vert3d->y, proj[1].vert3d->z,
-                       proj[2].vert3d->x, proj[2].vert3d->y, proj[2].vert3d->z,
-                       0};
-    outfile.write((const char*)&TRI, 50);
-    count++;
-
-    TRI = (stl_tri_t) {N.x, N.y, N.z,
-                       proj[0].vert3d->x, proj[0].vert3d->y, proj[0].vert3d->z,
-                       proj[2].vert3d->x, proj[2].vert3d->y, proj[2].vert3d->z,
-                       proj[3].vert3d->x, proj[3].vert3d->y, proj[3].vert3d->z,
-                       0};
-    outfile.write((const char*)&TRI, 50);
-    count++;
-    
-}
-
-
-int TypeBitmap::export_STL(std::string filename, reduced_foot_mode foot_mode, dim_t footXY, dim_t footZ, float UVstretchZ)
-{
-    int x, y;
-    int i, j, k;
-    int w = bm_width;
-    int h = bm_height;
-    unsigned int tri_cnt = 0;
-
-    uint8_t *buf8 = (uint8_t*)bitmap;
-    int32_t *buf32;
-
-    float RS = raster_size.as_mm();
-    float DOD = UVstretchZ*depth_of_drive.as_mm();
-
-    float BH = UVstretchZ*(type_height.as_mm()) - DOD; // Body height in mm
-
-    float FZ;
-    float FXY;
-
-    if (foot_mode == none) {
-        FZ = 0;
-        FXY = 0;
-    }
-    else {
-        FZ = footZ.as_mm() * UVstretchZ;
-        FXY = footXY.as_mm();
-    }
-
-
-    if (!loaded)
-    {
-        std::cerr << "ERROR: No Bitmap loaded." << std::endl;
-        return -1;
-    }
-
-    if (filename.empty())
-    {
-        std::cerr << "ERROR: No STL file specified." << std::endl;
-        return -1;
-    }
-
-    glyph_rects.clear();
-    body_rects.clear();
-
-    tag_bitmap_i32 = (int32_t*)calloc(w*h, sizeof(int32_t));
-    if (tag_bitmap_i32 == NULL) {
-        std::cerr << "ERROR: Could not open allocate tag bitmap." << std::endl;
-        return -1;
-    }
-    buf32 = tag_bitmap_i32;
-
-    for (y = 0; y < bm_height; y++) {
-        for (x = 0; x < bm_width; x++) {
-            if (*buf8++)
-                *buf32++ = +1;
-            else
-                *buf32++ = -1;
-        }
-    }
-    buf32 = tag_bitmap_i32;
-
-    // pseudo randomized loop
-    srand(0xB747);
-    int32_t tag_cnt = 2;
-    
-    const int ITERATIONS = 100000;
-
-    for (i = 0; i < ITERATIONS; i++) {
-        uint32_t rand_x = rand() % w;
-        uint32_t rand_y = rand() % h;
-
-        // check if rect'ed already
-        // expand rect
-        int32_t val = buf32[rand_y*w + rand_x];
-
-        if ((val != +1) && (val != -1))
-            continue; // already rect'ed
-
-        // expansion algorithm
-        bool expanded = false;
-
-        bool left_end = false;
-        bool right_end = false;
-        bool top_end = false;
-        bool bottom_end = false;
-
-        STLrect valrect;
-        valrect.left = rand_x;
-        valrect.right = rand_x;
-        valrect.top = rand_y;
-        valrect.bottom = rand_y;
-        if (val==+1)
-            valrect.tag =  tag_cnt;
-        else
-            valrect.tag =  -tag_cnt;
-
-        int index;
-
-        while(!left_end || !right_end || !top_end || !bottom_end) {
-
-            if (!left_end)
-                if (valrect.left==0)
-                    left_end = true;
-                else {
-                    index = (valrect.top*w) + (valrect.left-1);
-                    for (j=valrect.top; j<=valrect.bottom; j++) {
-                        if (buf32[index]!=val)
-                            break;
-                        index += w;
-                    }
-                    if (j<=valrect.bottom) { // failed
-                        left_end = true;
-                    }
-                    else {
-                        valrect.left--;
-                        expanded =  true;
-                    }
-                }
-
-            if (!top_end)
-                if (valrect.top==0)
-                    top_end = true;
-                else {
-                    index = ((valrect.top-1)*w) + (valrect.left);
-                    for (k=valrect.left; k<=valrect.right; k++) {
-                        if (buf32[index]!=val)
-                            break;
-                        index += 1;
-                    }
-                    if (k<=valrect.right) { // failed
-                        top_end = true;
-                    }
-                    else {
-                        valrect.top--;
-                        expanded =  true;
-                    }
-                }
-
-            if (!right_end)
-                if (valrect.right==w-1)
-                    right_end = true;
-                else {
-                    index = (valrect.top*w) + (valrect.right+1);
-                    for (j=valrect.top; j<=valrect.bottom; j++) {
-                        if (buf32[index]!=val)
-                            break;
-                        index += w;
-                    }
-                    if (j<=valrect.bottom) { // failed
-                        right_end = true;
-                    }
-                    else {
-                        valrect.right++;
-                        expanded =  true;
-                    }
-                }
-
-            if (!bottom_end)
-                if (valrect.bottom==h-1)
-                    bottom_end = true;
-                else {
-                    index = ((valrect.bottom+1)*w) + (valrect.left);
-                    for (k=valrect.left; k<=valrect.right; k++) {
-                        if (buf32[index]!=val)
-                            break;
-                        index += 1;
-                    }
-                    if (k<=valrect.right) { // failed
-                        bottom_end = true;
-                    }
-                    else {
-                        valrect.bottom++;
-                        expanded =  true;
-                    }
-                }
-        }
-
-        if (expanded) {
-            if (val==-1) {
-                body_rects.push_back(valrect);
-            }
-            if (val==+1) {
-                glyph_rects.push_back(valrect);
-            }
-
-            buf32 = tag_bitmap_i32;
-            buf32 += (valrect.top*w);
-            for (j=valrect.top; j<=valrect.bottom; j++) {
-                for (k=valrect.left; k<=valrect.right; k++) {
-                    buf32[k] = valrect.tag;
-                }
-                buf32 += w;
-            }
-            buf32 = tag_bitmap_i32;
-
-
-            tag_cnt++;
-        }
-    }
-
-
-    std::ofstream stl_out(filename, std::ios::binary);
-    if (!stl_out.is_open()) {
-        std::cerr << "ERROR: Could not open STL file for writing." << std::endl;
-        return -1;
-    }
-
-    // 80 byte header - content anything but "solid" (would indicated ASCII encoding)
-    for (i = 0; i < 80; i++)
-        stl_out.put('x');
-
-    stl_out.write((const char*)&tri_cnt, 4); // space for number of triangles
-
-    // normal vectors: X, Y, Z, positive, negative
-    pos3d_t Xp = (pos3d_t){ 1,  0,  0};  pos3d_t Xn = (pos3d_t){-1,  0,  0};
-    pos3d_t Yp = (pos3d_t){ 0,  1,  0};  pos3d_t Yn = (pos3d_t){ 0, -1,  0};
-    pos3d_t Zp = (pos3d_t){ 0,  0,  1};  pos3d_t Zn = (pos3d_t){ 0,  0, -1};
-
-    // normal vectors: - 45 degrees downwards
-    pos3d_t LD = (pos3d_t){-1,  0, -1}; // left down
-    pos3d_t RD = (pos3d_t){ 1,  0, -1}; // right down
-    pos3d_t TD = (pos3d_t){ 0,  1, -1}; // top down
-    pos3d_t BD = (pos3d_t){ 0, -1, -1}; // bottom down
-
-    // cube corners: upper/lower;top/botton;left/right
-    pos3d_t utl, utr, ubl, ubr, ltl, ltr, lbl, lbr;
-
-    // SINGLE PIXELS
-    for (y = 0; y < bm_height; y++) {
-        for (x = 0; x < bm_width; x++) {
-
-            // pixel cube corners - assuming cubes are going up from Z=0 to Z=+(depth of drive)
-            utl = (pos3d_t){RS * x, -RS * y, DOD};
-            utr = (pos3d_t){RS * (x + 1), -RS * y, DOD};
-            ubl = (pos3d_t){RS * x, -RS * (y + 1), DOD};
-            ubr = (pos3d_t){RS * (x + 1), -RS * (y + 1), DOD};
-
-            ltl = (pos3d_t){RS * x, -RS * y, 0};
-            ltr = (pos3d_t){RS * (x + 1), -RS * y, 0};
-            lbl = (pos3d_t){RS * x, -RS * (y + 1), 0};
-            lbr = (pos3d_t){RS * (x + 1), -RS * (y + 1), 0};
-
-            // single pixel upper faces (glyph)
-            if (buf32[y * w + x] == +1) {
-                // upper face
-                STL_rect_write(stl_out, Zp, utr, utl, ubl, ubr, tri_cnt);
-            }
-
-            // single pixel upper faces (body / no glyph)
-            if (buf32[y * w + x] == -1) {
-                // lower faces become upper faces of body for 0
-                STL_rect_write(stl_out, Zp, ltr, lbl, ltl, lbr, tri_cnt);
-            }
-
-            // side walls of glyph
-            if (buf32[y * w + x] > 0) {
-                
-
-                // left face
-                if ((x == 0) || (buf32[((y)*w) + (x - 1)] < 0)) {
-                    STL_rect_write(stl_out, Xn, ubl, utl, ltl, lbl, tri_cnt);
-                }
-
-                // right face
-                if ((x == (bm_width - 1)) || (buf32[((y)*w) + (x + 1)] < 0)) {
-                    STL_rect_write(stl_out, Xp, ubr, ltr, utr, lbr, tri_cnt);
-                }
-
-                // top face
-                if ((y == 0) || (buf32[((y - 1) * w) + (x)] < 0)) {
-                    STL_rect_write(stl_out, Yp, utl, utr, ltr, ltl, tri_cnt);
-                }
-
-                // bottom face
-                if ((y == (bm_height - 1)) || (buf32[((y + 1) * w) + (x)] < 0)) {
-                    STL_rect_write(stl_out, Yn, ubl, lbr, ubr, lbl, tri_cnt);
-                }
-            }
-        }
-    }
-
-    // LARGE RECTS 
-    for (i = 0; i < glyph_rects.size(); i++) {
-            STLrect R = glyph_rects[i];
-
-            utl = (pos3d_t){RS * R.left, -RS * R.top, DOD};
-            utr = (pos3d_t){RS * (R.right + 1), -RS * R.top, DOD};
-            ubl = (pos3d_t){RS * R.left, -RS * (R.bottom + 1), DOD};
-            ubr = (pos3d_t){RS * (R.right + 1), -RS * (R.bottom + 1), DOD};
-
-            STL_rect_write(stl_out, Zp, utr, utl, ubl, ubr, tri_cnt);
-    }
-
-    for (i = 0; i < body_rects.size(); i++) {
-            STLrect R = body_rects[i];
-
-            ltl = (pos3d_t){RS * R.left, -RS * R.top, 0};
-            ltr = (pos3d_t){RS * (R.right + 1), -RS * R.top, 0};
-            lbl = (pos3d_t){RS * R.left, -RS * (R.bottom + 1), 0};
-            lbr = (pos3d_t){RS * (R.right + 1), -RS * (R.bottom + 1), 0};
-
-            STL_rect_write(stl_out, Zp, ltr, lbl, ltl, lbr, tri_cnt);
-    }
-
-
-    // BODY
-
-    // type body cube corners - assuming cube goes down from Z=0 to Z=-(type height - depth of drive)
-
-    utl = (pos3d_t){0, 0, 0};
-    utr = (pos3d_t){RS * w, 0, 0};
-    ubl = (pos3d_t){0, -RS * h, 0};
-    ubr = (pos3d_t){RS * w, -RS * h, 0};
-
-    ltl = (pos3d_t){0, 0, -(BH-FZ)};
-    ltr = (pos3d_t){RS * w, 0, -(BH-FZ)};
-    lbl = (pos3d_t){0, -RS * h, -(BH-FZ)};
-    lbr = (pos3d_t){RS * w, -RS * h, -(BH-FZ)};
-
-    // left face
-    STL_rect_write(stl_out, Xn, ubl, utl, ltl, lbl, tri_cnt);
-
-    // right face
-    STL_rect_write(stl_out, Xp, ubr, ltr, utr, lbr, tri_cnt);
-
-    // top face
-    STL_rect_write(stl_out, Yp, utl, utr, ltr, ltl, tri_cnt);
-
-    // bottom face
-    STL_rect_write(stl_out, Yn, ubl, lbr, ubr, lbl, tri_cnt);
-
-
-    // lower(lowest) face - bevel/step foot
-    if ((foot_mode == step) || (foot_mode == bevel)) {
-        ltl = (pos3d_t){FXY, -FXY, -BH};
-        ltr = (pos3d_t){RS*w - FXY, -FXY, -BH};
-        lbl = (pos3d_t){FXY, -RS*h + FXY, -BH};
-        lbr = (pos3d_t){RS*w - FXY, -RS*h + FXY, -BH};
-    }
-
-    if (foot_mode == step) { // stepped foot
-        utl = (pos3d_t){FXY, -FXY, -(BH-FZ)};
-        utr = (pos3d_t){RS*w - FXY, -FXY, -(BH-FZ)};
-        ubl = (pos3d_t){FXY, -RS*h + FXY, -(BH-FZ)};
-        ubr = (pos3d_t){RS*w - FXY, -RS*h + FXY, -(BH-FZ)};
-
-        // left face
-        STL_rect_write(stl_out, Xn, ubl, utl, ltl, lbl, tri_cnt);
-
-        // right face
-        STL_rect_write(stl_out, Xp, ubr, ltr, utr, lbr, tri_cnt);
-
-        // top face
-        STL_rect_write(stl_out, Yp, utl, utr, ltr, ltl, tri_cnt);
-
-        // bottom face
-        STL_rect_write(stl_out, Yn, ubl, lbr, ubr, lbl, tri_cnt);
-
-    }
-
-    // TODO: NEEDS SUPPORT FOR SLANTED NORMALS
-    if (foot_mode == bevel) { // beveled foot
-        utl = (pos3d_t){0, 0, -(BH-FZ)};
-        utr = (pos3d_t){RS * w, 0, -(BH-FZ)};
-        ubl = (pos3d_t){0, -RS * h, -(BH-FZ)};
-        ubr = (pos3d_t){RS * w, -RS * h, -(BH-FZ)};
-/*
-        // left face
-        STL_triangle_write(stl_out, LD, ubl, utl, ltl, tri_cnt);
-        STL_triangle_write(stl_out, LD, ubl, ltl, lbl, tri_cnt);
-
-        // right face
-        STL_triangle_write(stl_out, RD, ubr, ltr, utr, tri_cnt);
-        STL_triangle_write(stl_out, RD, ubr, lbr, ltr, tri_cnt);
-
-        // top face
-        STL_triangle_write(stl_out, TD, utl, utr, ltr, tri_cnt);
-        STL_triangle_write(stl_out, TD, utl, ltr, ltl, tri_cnt);
-
-        // bottom face
-        STL_triangle_write(stl_out, BD, ubl, lbr, ubr, tri_cnt);
-        STL_triangle_write(stl_out, BD, ubl, lbl, lbr, tri_cnt);
-*/
-    }
-
-    // bevel/step foot
-    if ((foot_mode == step) || (foot_mode == bevel)) {
-        ltl = (pos3d_t){FXY, -FXY, -BH};
-        ltr = (pos3d_t){RS*w - FXY, -FXY, -BH};
-        lbl = (pos3d_t){FXY, -RS*h + FXY, -BH};
-        lbr = (pos3d_t){RS*w - FXY, -RS*h + FXY, -BH};
-    }
-
-    // lower face - prepared XY coordinates differ between foot_mode "none" and "bevel/step"
-    STL_rect_write(stl_out, Zn, ltr, lbl, ltl, lbr, tri_cnt);
-
-    if (foot_mode == step) { // stepped foot
-        // downlooking faces around step rim
-
-        utl = (pos3d_t){0, 0, -(BH-FZ)};
-        utr = (pos3d_t){RS * w, 0, -(BH-FZ)};
-        ubl = (pos3d_t){0, -RS * h, -(BH-FZ)};
-        ubr = (pos3d_t){RS * w, -RS * h, -(BH-FZ)};
-
-
-        ltl = (pos3d_t){FXY, -FXY, -(BH-FZ)};
-        ltr = (pos3d_t){RS*w - FXY, -FXY, -(BH-FZ)};
-        lbl = (pos3d_t){FXY, -RS*h + FXY, -(BH-FZ)};
-        lbr = (pos3d_t){RS*w - FXY, -RS*h + FXY, -(BH-FZ)};
-
-        // left downward face
-        STL_rect_write(stl_out, Zn, ubl, utl, ltl, lbl, tri_cnt);
-
-        // right downward face
-        STL_rect_write(stl_out, Zn, ubr, ltr, utr, lbr, tri_cnt);
-
-        // top downward face
-        STL_rect_write(stl_out, Zn, utl, utr, ltr, ltl, tri_cnt);
-
-        // bottom downward face
-        STL_rect_write(stl_out, Zn, ubl, lbr, ubr, lbl, tri_cnt);
-    }
-
-
-    std::cout << "Triangle count is " << tri_cnt << std::endl;
-
-    stl_out.seekp(80);
-    stl_out.write((const char*)&tri_cnt, 4);
-    stl_out.close();
-
-
-    if (tag_bitmap_i32 != NULL)
-        free(tag_bitmap_i32);
-    tag_bitmap_i32 = NULL;
-
-
-    std::cout << "Wrote binary STL data to " << filename << std::endl;
-    std::cout << "---------------------" << std::endl;
-    std::cout << "Exported STL metrics:" << std::endl;
-    std::cout << "Type height   " << boost::format("%6.4f") % type_height.as_inch()
-              << " inch  |  "  << boost::format("%6.3f") %  type_height.as_mm() << " mm" << std::endl;
-    std::cout << "Body size     " << boost::format("%6.4f") % (h*raster_size.as_inch())
-              << " inch  |  "  << boost::format("%6.3f") %  (h*raster_size.as_mm()) << " mm" << std::endl;
-    std::cout << "Set width     " << boost::format("%6.4f") % (w*raster_size.as_inch())
-              << " inch  |  "  << boost::format("%6.3f") %  (w*raster_size.as_mm()) << " mm" << std::endl;
-
-    return 0;
-}
-
-
 void TypeBitmap::OBJ_rect_push(intvec3d_t N, intvec3d_t v1, intvec3d_t v2, intvec3d_t v3, intvec3d_t v4)
 {
     // TODO: Only works for normal vectors with only one non-0 component so far! Do real projection later
@@ -971,17 +391,20 @@ void TypeBitmap::OBJ_rect_push(intvec3d_t N, intvec3d_t v1, intvec3d_t v2, intve
 
     OBJtriangle TRI;
 
+    TRI.N = N;
     TRI.v1 = find_or_add_vertex(*(proj[0].vert3d));
     TRI.v2 = find_or_add_vertex(*(proj[1].vert3d));
     TRI.v3 = find_or_add_vertex(*(proj[2].vert3d));
     triangles.push_back(TRI);
 
+    TRI.N = N;
     TRI.v1 = find_or_add_vertex(*(proj[0].vert3d));
     TRI.v2 = find_or_add_vertex(*(proj[2].vert3d));
     TRI.v3 = find_or_add_vertex(*(proj[3].vert3d));
     triangles.push_back(TRI);
 
 }
+
 
 uint32_t TypeBitmap::find_or_add_vertex(intvec3d_t v)
 {
@@ -1000,7 +423,7 @@ uint32_t TypeBitmap::find_or_add_vertex(intvec3d_t v)
 }
 
 
-int TypeBitmap::export_OBJ(std::string filename, reduced_foot_mode foot_mode, dim_t footXY, dim_t footZ, float UVstretchZ)
+int TypeBitmap::generateMesh(reduced_foot_mode foot_mode, dim_t footXY, dim_t footZ, float UVstretchZ)
 {
     int x, y;
     int i, j, k;
@@ -1041,11 +464,6 @@ int TypeBitmap::export_OBJ(std::string filename, reduced_foot_mode foot_mode, di
         return -1;
     }
 
-    if (filename.empty())
-    {
-        std::cerr << "ERROR: No STL file specified." << std::endl;
-        return -1;
-    }
 
     glyph_rects.clear();
     body_rects.clear();
@@ -1205,15 +623,6 @@ int TypeBitmap::export_OBJ(std::string filename, reduced_foot_mode foot_mode, di
             tag_cnt++;
         }
     }
-
-
-    std::ofstream obj_out(filename, std::ios::binary);
-    if (!obj_out.is_open()) {
-        std::cerr << "ERROR: Could not open STL file for writing." << std::endl;
-        return -1;
-    }
-
-    // TODO: TEXT HEADER?
 
 
     // normal vectors: X, Y, Z, positive, negative
@@ -1432,8 +841,140 @@ int TypeBitmap::export_OBJ(std::string filename, reduced_foot_mode foot_mode, di
     }
 
 
+    if (tag_bitmap_i32 != NULL)
+        free(tag_bitmap_i32);
+    tag_bitmap_i32 = NULL;
+
+
+    return 0;
+}
+
+
+int TypeBitmap::writeOBJ(std::string filename)
+{
+    int i;
+    int w = bm_width;
+    int h = bm_height;
+
+    float RS = raster_size.as_mm();
+    float LH = layer_height.as_mm();
+
+    if (filename.empty())
+    {
+        std::cerr << "ERROR: No OBJ file specified." << std::endl;
+        return -1;
+    }
+
+    std::ofstream obj_out(filename, std::ios::binary);
+    if (!obj_out.is_open()) {
+        std::cerr << "ERROR: Could not open OBJ file for writing." << std::endl;
+        return -1;
+    }
+
     std::cout << "Triangle count is " << triangles.size() << std::endl;
 
+    obj_out << "### OBJ data exported from t3t_pbm2stl:" << std::endl;
+
+    obj_out << std::endl << "# Vertices with coordinates in mm:" << std::endl;
+    for (i=1; i<vertices.size(); i++) {
+        intvec3d_t vertex = vertices[i];
+        int32_t x_0um1 = int32_t(round(vertex.x * RS * 10000));
+        int32_t y_0um1 = int32_t(round(vertex.y * RS * 10000));
+        int32_t z_0um1 = int32_t(round(vertex.z * LH * 10000));
+        float x = vertex.x * RS;
+        float y = vertex.y * RS;
+        float z = vertex.z * LH;
+
+        obj_out << "v "
+                << x << " "
+                << y << " "
+                << z << " "
+//                << (x_0um1 / 10000) << "." << abs(x_0um1 % 10000) << " "    /* doesnt work without leading 0s on fractions*/
+//                << (y_0um1 / 10000) << "." << abs(y_0um1 % 10000) << " "
+//                << (z_0um1 / 10000) << "." << abs(z_0um1 % 10000) << " "
+                << std::endl;
+    }
+
+    obj_out << std::endl << "# Triangles by vertex number:" << std::endl;
+    for (i=0; i<triangles.size(); i++) {
+        OBJtriangle triangle = triangles[i];
+        obj_out << "f "
+                << triangle.v1 << " "
+                << triangle.v2 << " "
+                << triangle.v3 << " "
+                << std::endl;
+    }
+    obj_out.close();
+
+    std::cout << "Wrote binary STL data to " << filename << std::endl;
+    std::cout << "---------------------" << std::endl;
+    std::cout << "Exported STL metrics:" << std::endl;
+    std::cout << "Type height   " << boost::format("%6.4f") % type_height.as_inch()
+              << " inch  |  "  << boost::format("%6.3f") %  type_height.as_mm() << " mm" << std::endl;
+    std::cout << "Body size     " << boost::format("%6.4f") % (h*raster_size.as_inch())
+              << " inch  |  "  << boost::format("%6.3f") %  (h*raster_size.as_mm()) << " mm" << std::endl;
+    std::cout << "Set width     " << boost::format("%6.4f") % (w*raster_size.as_inch())
+              << " inch  |  "  << boost::format("%6.3f") %  (w*raster_size.as_mm()) << " mm" << std::endl;
+
+    return 0;
+}
+
+
+
+int TypeBitmap::writeSTL(std::string filename)
+{
+    int i;
+    int w = bm_width;
+    int h = bm_height;
+
+    float RS = raster_size.as_mm();
+    float LH = layer_height.as_mm();
+
+    if (filename.empty())
+    {
+        std::cerr << "ERROR: No STL file specified." << std::endl;
+        return -1;
+    }
+
+    std::ofstream stl_out(filename, std::ios::binary);
+    if (!stl_out.is_open()) {
+        std::cerr << "ERROR: Could not open STL file for writing." << std::endl;
+        return -1;
+    }
+
+    std::cout << "Triangle count is " << triangles.size() << std::endl;
+
+    // 80 byte header - content anything but "solid" (would indicated ASCII encoding)
+    for (i = 0; i < 80; i++)
+        stl_out.put('x');
+
+    uint32_t tri_cnt = triangles.size();
+    stl_out.write((const char*)&tri_cnt, 4); // space for number of triangles
+
+
+    for (i=0; i<triangles.size(); i++) {
+        OBJtriangle triangle = triangles[i];
+        intvec3d_t N = triangles[i].N;
+        intvec3d_t v1 = vertices[triangles[i].v1];
+        intvec3d_t v2 = vertices[triangles[i].v2];
+        intvec3d_t v3 = vertices[triangles[i].v3];
+
+        stl_tri_t TRI;
+        TRI = (stl_tri_t) {float(N.x), float(N.y), float(N.z),
+                        v1.x * RS, v1.y * RS, v1.z * LH,
+                        v2.x * RS, v2.y * RS, v2.z * LH,
+                        v3.x * RS, v3.y * RS, v3.z * LH,
+                        0};
+        stl_out.write((const char*)&TRI, 50);
+    }
+
+    stl_out.close();
+
+
+
+
+
+/*
     obj_out << "### OBJ data exported from t3t_pbm2stl:" << std::endl;
 
     obj_out << std::endl << "# Vertices with coordinates in mm:" << std::endl;
@@ -1466,13 +1007,7 @@ int TypeBitmap::export_OBJ(std::string filename, reduced_foot_mode foot_mode, di
                 << std::endl;
     }
     obj_out.close();
-
-
-    if (tag_bitmap_i32 != NULL)
-        free(tag_bitmap_i32);
-    tag_bitmap_i32 = NULL;
-
-
+*/
     std::cout << "Wrote binary STL data to " << filename << std::endl;
     std::cout << "---------------------" << std::endl;
     std::cout << "Exported STL metrics:" << std::endl;
@@ -1485,3 +1020,4 @@ int TypeBitmap::export_OBJ(std::string filename, reduced_foot_mode foot_mode, di
 
     return 0;
 }
+
