@@ -290,8 +290,8 @@ int TypeBitmap::set_type_parameters(dim_t TH, dim_t DOD, dim_t RS, dim_t LH)
 
 void TypeBitmap::OBJ_rect_push(intvec3d_t N, intvec3d_t v1, intvec3d_t v2, intvec3d_t v3, intvec3d_t v4)
 {
-    // TODO: Only works for normal vectors with only one non-0 component so far! Do real projection later
     float twoPi = 8*atan(1);
+    float halfPi = 2*atan(1);
 
     struct prj2d_t {
         intvec3d_t *vert3d;
@@ -314,37 +314,69 @@ void TypeBitmap::OBJ_rect_push(intvec3d_t N, intvec3d_t v1, intvec3d_t v2, intve
     proj[3].vert3d = &v4;
     proj[3].pos = 3;
 
+    pos3d_t Nf = (pos3d_t) {.x = float(N.x), .y = float(N.y), .z = float(N.z)};
+    float cosrY, sinrY, cosrX, sinrX;
+
+    if ((Nf.z==0) && (Nf.x==0)) { // don't turn around Y
+        cosrY = 1;
+        sinrY = 0;
+    }
+    else {
+        // get X-to-Z arc (rotate around Y)
+        //normalize x
+        float x_unit = Nf.x / sqrtf(Nf.x*Nf.x + Nf.z*Nf.z);
+        // get angle from X-axis into XZ plane
+        float xz_angle = acosf(x_unit);
+        if (Nf.z < 0) {
+            xz_angle = twoPi - xz_angle;
+        }
+        float rotY = -(halfPi - xz_angle);
+
+        cosrY = cosf(rotY);
+        sinrY = sinf(rotY);
+    }
+    // rotate around Y
+    pos3d_t Nb;
+    Nb.x = Nf.x*cosrY + Nf.z*sinrY;
+    Nb.y = Nf.y;
+    Nb.z = -Nf.x*sinrY + Nf.z*cosrY;
+    //std::cout << "Norm after Y rot:  x=" << Nb.x << ", y=" << Nb.y << ", z=" << Nb.z << std::endl;
+
+    if ((Nb.z==0) && (Nb.y==0)) { // don't turn around X
+        cosrX = 1;
+        sinrX = 0;
+    }
+    else {
+        // get Y-to-Z arc (rotate around X)
+        //normalize y
+        float y_unit = Nb.y / sqrtf(Nb.y*Nb.y + Nb.z*Nb.z);
+        // get angle from Y-axis into XZ plane
+        float yz_angle = acosf(y_unit);
+        if (Nb.z < 0) {
+            yz_angle = twoPi - yz_angle;
+        }
+        float rotX = (halfPi - yz_angle);
+        cosrX = cosf( rotX );
+        sinrX = sinf( rotX );
+    }
+
+    /* full two-step X-Y for the record
+        pos3d_t P1 = { 1, 1, 0 };
+        Nb.x =  P1.x*cosrY + P1.z*sinrY;
+        Nb.y =  P1.y;
+        Nb.z = -P1.x*sinrY + P1.z*cosrY;
+        P1.x = Nb.x;
+        P1.y = Nb.y*cosrX - Nb.z*sinrX;
+        P1.z = Nb.y*sinrX + Nb.z*cosrX;
+        std::cout << "P1 after Y-X rot:  x=" << P1.x << ", y=" << P1.y << ", z=" << P1.z << std::endl;
+    */
+
     for (int i=0; i<4; i++) {
-        if (N.z > 0) {
-            proj[i].px = + proj[i].vert3d->x;
-            proj[i].py = + proj[i].vert3d->y;
-            continue;
-        }
-        if (N.z < 0) { // could also swap y instead I think
-            proj[i].px = - proj[i].vert3d->x;
-            proj[i].py = + proj[i].vert3d->y;
-            continue;
-        }
-        if (N.y > 0) {
-            proj[i].px = + proj[i].vert3d->x;
-            proj[i].py = - proj[i].vert3d->z;
-            continue;
-        }
-        if (N.y < 0) {
-            proj[i].px = + proj[i].vert3d->x;
-            proj[i].py = + proj[i].vert3d->z;
-            continue;
-        }
-        if (N.x > 0) {
-            proj[i].px = - proj[i].vert3d->z;
-            proj[i].py = + proj[i].vert3d->y;
-            continue;
-        }
-        if (N.x < 0) {
-            proj[i].px = + proj[i].vert3d->z;
-            proj[i].py = + proj[i].vert3d->y;
-            continue;
-        }
+        float x = float(proj[i].vert3d->x);
+        float y = float(proj[i].vert3d->y);
+        float z = float(proj[i].vert3d->z);
+        proj[i].px = x*cosrY + z*sinrY;
+        proj[i].py = y*cosrX - (-x*sinrY + z*cosrY)*sinrX;
     }
 
     float center_x = (proj[0].px + proj[1].px + proj[2].px + proj[3].px) / 4;
@@ -355,10 +387,8 @@ void TypeBitmap::OBJ_rect_push(intvec3d_t N, intvec3d_t v1, intvec3d_t v2, intve
         float deltay = proj[i].py - center_y;
         float norm = sqrt(deltax*deltax + deltay*deltay);
         deltax /= norm;
-        //deltay /= norm; // abs value not used
         float ang = acos(deltax);
         if (deltay < 0)
-        
             ang = twoPi - ang; // 0..2pi position at this point
 
         proj[i].angle = ang;
@@ -369,7 +399,7 @@ void TypeBitmap::OBJ_rect_push(intvec3d_t N, intvec3d_t v1, intvec3d_t v2, intve
         
     }
 
-    // bubble sort 1..3
+    // bubble sort 1..3 
     uint8_t swap_pos;
     float swap_angle;
     intvec3d_t *swap_vert3d;
@@ -402,7 +432,6 @@ void TypeBitmap::OBJ_rect_push(intvec3d_t N, intvec3d_t v1, intvec3d_t v2, intve
     TRI.v2 = find_or_add_vertex(*(proj[2].vert3d));
     TRI.v3 = find_or_add_vertex(*(proj[3].vert3d));
     triangles.push_back(TRI);
-
 }
 
 
