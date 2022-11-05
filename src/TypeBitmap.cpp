@@ -419,7 +419,7 @@ void TypeBitmap::OBJ_rect_push(intvec3d_t N, intvec3d_t v1, intvec3d_t v2, intve
         }
     }
 
-    OBJtriangle TRI;
+    mesh_triangle TRI;
 
     TRI.N = N;
     TRI.v1 = find_or_add_vertex(*(proj[0].vert3d));
@@ -452,7 +452,7 @@ uint32_t TypeBitmap::find_or_add_vertex(intvec3d_t v)
 }
 
 
-int TypeBitmap::generateMesh(reduced_foot_mode foot_mode, dim_t footXY, dim_t footZ, float UVstretchZ)
+int TypeBitmap::generateMesh(reduced_foot foot, float UVstretchZ)
 {
     int x, y;
     int i, j, k;
@@ -477,13 +477,13 @@ int TypeBitmap::generateMesh(reduced_foot_mode foot_mode, dim_t footXY, dim_t fo
     int32_t FZ;
     int32_t FXY;
 
-    if (foot_mode == none) {
+    if (foot.mode == no_foot) {
         FZ = 0;
         FXY = 0;
     }
     else {
-        FZ = int32_t( round( (footZ.as_mm() * UVstretchZ)/LH ) );
-        FXY = int32_t( round( footXY.as_mm()/RS  ) );
+        FZ = int32_t( round( (foot.Z.as_mm() * UVstretchZ)/LH ) );
+        FXY = int32_t( round( foot.XY.as_mm()/RS  ) );
     }
 
 
@@ -779,14 +779,14 @@ int TypeBitmap::generateMesh(reduced_foot_mode foot_mode, dim_t footXY, dim_t fo
 
 
     // lower(lowest) face - bevel/step foot
-    if ((foot_mode == step) || (foot_mode == bevel)) {
+    if ((foot.mode == step) || (foot.mode == bevel)) {
         ltl = (intvec3d_t){FXY,         -FXY, -BH};
         ltr = (intvec3d_t){w - FXY,     -FXY, -BH};
         lbl = (intvec3d_t){FXY,     -h + FXY, -BH};
         lbr = (intvec3d_t){w - FXY, -h + FXY, -BH};
     }
 
-    if (foot_mode == step) { // stepped foot
+    if (foot.mode == step) { // stepped foot
         utl = (intvec3d_t){FXY,         -FXY, -(BH-FZ)};
         utr = (intvec3d_t){w - FXY,     -FXY, -(BH-FZ)};
         ubl = (intvec3d_t){FXY,     -h + FXY, -(BH-FZ)};
@@ -806,8 +806,8 @@ int TypeBitmap::generateMesh(reduced_foot_mode foot_mode, dim_t footXY, dim_t fo
 
     }
 
-    // TODO: NEEDS SUPPORT FOR SLANTED NORMALS
-    if (foot_mode == bevel) { // beveled foot
+    // TODO: CREATE ACCURATE NORMALS
+    if (foot.mode == bevel) { // beveled foot
         utl = (intvec3d_t){0,  0, -(BH-FZ)};
         utr = (intvec3d_t){w,  0, -(BH-FZ)};
         ubl = (intvec3d_t){0, -h, -(BH-FZ)};
@@ -832,17 +832,17 @@ int TypeBitmap::generateMesh(reduced_foot_mode foot_mode, dim_t footXY, dim_t fo
     }
 
     // bevel/step foot
-    if ((foot_mode == step) || (foot_mode == bevel)) {
+    if ((foot.mode == step) || (foot.mode == bevel)) {
         ltl = (intvec3d_t){FXY,         -FXY, -BH};
         ltr = (intvec3d_t){w - FXY,     -FXY, -BH};
         lbl = (intvec3d_t){FXY,     -h + FXY, -BH};
         lbr = (intvec3d_t){w - FXY, -h + FXY, -BH};
     }
 
-    // lower face - prepared XY coordinates differ between foot_mode "none" and "bevel/step"
+    // lower face - prepared XY coordinates differ between foot.mode "no_foot" and "bevel/step"
     OBJ_rect_push(Zn, ltr, lbl, ltl, lbr);
 
-    if (foot_mode == step) { // stepped foot
+    if (foot.mode == step) { // stepped foot
         // downlooking faces around step rim
 
         utl = (intvec3d_t){0,  0, -(BH-FZ)};
@@ -926,7 +926,7 @@ int TypeBitmap::writeOBJ(std::string filename)
 
     obj_out << std::endl << "# Triangles by vertex number:" << std::endl;
     for (i=0; i<triangles.size(); i++) {
-        OBJtriangle triangle = triangles[i];
+        mesh_triangle triangle = triangles[i];
         obj_out << "f "
                 << triangle.v1 << " "
                 << triangle.v2 << " "
@@ -982,7 +982,7 @@ int TypeBitmap::writeSTL(std::string filename)
 
 
     for (i=0; i<triangles.size(); i++) {
-        OBJtriangle triangle = triangles[i];
+        mesh_triangle triangle = triangles[i];
         intvec3d_t N = triangles[i].N;
         intvec3d_t v1 = vertices[triangles[i].v1];
         intvec3d_t v2 = vertices[triangles[i].v2];
@@ -1028,7 +1028,7 @@ int TypeBitmap::writeSTL(std::string filename)
 
     obj_out << std::endl << "# Triangles by vertex number:" << std::endl;
     for (i=0; i<triangles.size(); i++) {
-        OBJtriangle triangle = triangles[i];
+        mesh_triangle triangle = triangles[i];
         obj_out << "f "
                 << triangle.v1 << " "
                 << triangle.v2 << " "

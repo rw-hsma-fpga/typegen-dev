@@ -19,7 +19,7 @@ struct {
     dim_t raster_size;
     dim_t layer_height;
 
-    reduced_foot_mode foot_mode;
+    reduced_foot foot;
     dim_t reduced_foot_XY;
     dim_t reduced_foot_Z;
 
@@ -33,7 +33,7 @@ struct {
 
     float Zshrink_pct;
 
-} opts = { .foot_mode = none, .create_work_path = false, .Zshrink_pct = 0 };
+} opts = { .create_work_path = false, .Zshrink_pct = 0 };
 
 
 int parse_options(int ac, char* av[]);
@@ -94,9 +94,7 @@ int main(int ac, char* av[])
 
         TBM->load(pbm_path);
 
-        TBM->generateMesh(opts.foot_mode,
-                        opts.reduced_foot_XY, opts.reduced_foot_Z,
-                        UVstretchZ);
+        TBM->generateMesh(opts.foot, UVstretchZ);
 
         TBM->writeOBJ(obj_path);
         TBM->writeSTL(stl_path);
@@ -180,19 +178,24 @@ int parse_options(int ac, char* av[])
         get_yaml_dim_node(config, "depth of drive", opts.depth_of_drive);
         get_yaml_dim_node(config, "raster size", opts.raster_size);
         get_yaml_dim_node(config, "layer height", opts.layer_height);
-        get_yaml_dim_node(config, "reduced foot XY", opts.reduced_foot_XY);
-        get_yaml_dim_node(config, "reduced foot Z", opts.reduced_foot_Z);
+        get_yaml_dim_node(config, "reduced foot XY", opts.foot.XY);
+        get_yaml_dim_node(config, "reduced foot Z", opts.foot.Z);
 
+        if (config["nicks"]) {
+        }
+
+        // REDUCED FOOT PARAMETERS
         if (config["reduced foot mode"]) {
             string foot_mode_str = config["reduced foot mode"].as<std::string>();
             if (foot_mode_str=="bevel")
-                opts.foot_mode = bevel;
+                opts.foot.mode = bevel;
             else if (foot_mode_str=="step")
-                opts.foot_mode = step;
+                opts.foot.mode = step;
             else
-                opts.foot_mode = none;
+                opts.foot.mode = no_foot;
         }
 
+        // WORKING DIRECTORY
         if (config["working directory"]) {
             if (config["working directory"]["path"])
                 opts.work_path = config["working directory"]["path"].as<std::string>();
@@ -200,6 +203,7 @@ int parse_options(int ac, char* av[])
                 opts.create_work_path = config["working directory"]["create"].as<bool>();
         }
         
+        // LIST OF TYPE CHARACTERS REQUIRED
         if (config["characters"]) {
             YAML::Node chars = config["characters"];
 
@@ -215,7 +219,7 @@ int parse_options(int ac, char* av[])
             }
         }
 
-
+        // Z SHRINKAGE OBSERVED AND TO BE COMPENSATED FOR
         if (config["Zshrink_pct"]) {
             opts.Zshrink_pct = config["Zshrink_pct"].as<float>();
         }

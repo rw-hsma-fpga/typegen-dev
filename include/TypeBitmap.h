@@ -6,7 +6,23 @@
 #include <vector>
 #include "t3t_support_types.h"
 
-enum reduced_foot_mode {none, bevel, step};
+enum reduced_foot_mode { no_foot , bevel, step};
+
+struct reduced_foot {
+    reduced_foot_mode mode;
+    dim_t XY; // reduction on each edge
+    dim_t Z;  // height of reduction
+    reduced_foot() { mode = no_foot; };
+};
+
+enum nick_type{ nick_undefined, flat, triangle, rect, semicirc};
+
+struct nick {
+    nick_type type;
+    dim_t z;
+    dim_t y;
+    nick() { type = nick_undefined; }
+};
 
 class TypeBitmap {
     bool loaded;
@@ -14,7 +30,7 @@ class TypeBitmap {
     uint32_t bm_width;
     uint32_t bm_height;
 
-    // for optimized STL conversion
+    // for optimized mesh conversion (enlarged rects)
     int32_t *tag_bitmap_i32;
 
     struct STLrect {
@@ -24,13 +40,13 @@ class TypeBitmap {
     std::vector<STLrect> glyph_rects;
     std::vector<STLrect> body_rects;
 
-    // for optimized OBJ conversion
-    struct OBJtriangle {
+    // for optimized mesh conversion
+    struct mesh_triangle {
         intvec3d_t N;
         uint32_t v1, v2, v3; // vertex indices
     };
     std::vector<intvec3d_t> vertices;
-    std::vector<OBJtriangle> triangles;
+    std::vector<mesh_triangle> triangles;
 
     dim_t type_height;
     dim_t depth_of_drive;
@@ -62,10 +78,9 @@ class TypeBitmap {
 
         int set_type_parameters(dim_t TH, dim_t DOD, dim_t RS, dim_t LH);
 
-        int generateMesh(reduced_foot_mode foot_mode, dim_t footXY, dim_t footZ, float UVstretchZ);
+        int generateMesh(reduced_foot foot, float UVstretchZ);
         int writeOBJ(std::string filename);
         int writeSTL(std::string filename);
-
 };
 
 #endif // TYPEBITMAP_H
