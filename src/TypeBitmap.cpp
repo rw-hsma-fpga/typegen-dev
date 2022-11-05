@@ -191,6 +191,7 @@ int TypeBitmap::store(std::string filename)
     return 0;
 }
 
+
 int TypeBitmap::pasteGlyph(uint8_t *glyph, uint32_t g_width, uint32_t g_height, uint32_t top_pos, uint32_t left_pos)
 {
     int g_x, g_y, bm_x, bm_y;
@@ -228,6 +229,7 @@ int TypeBitmap::pasteGlyph(uint8_t *glyph, uint32_t g_width, uint32_t g_height, 
     return 0;
 }
 
+
 void TypeBitmap::threshold(uint8_t thr) {
 
     uint32_t x, y;
@@ -248,6 +250,7 @@ void TypeBitmap::threshold(uint8_t thr) {
     }
     return;
 }
+
 
 void TypeBitmap::mirror() {
 
@@ -452,47 +455,21 @@ uint32_t TypeBitmap::find_or_add_vertex(intvec3d_t v)
 }
 
 
-int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float UVstretchZ)
+int TypeBitmap::find_rectangles(void)
 {
     int x, y;
     int i, j, k;
+
     int w = bm_width;
     int h = bm_height;
-
-    vertices.clear();
-    intvec3d_t vec3dbuf = (intvec3d_t) {INT32_MIN, INT32_MIN, INT32_MIN};
-    vertices.push_back(vec3dbuf);
-
-    triangles.clear();
-
     uint8_t *buf8 = (uint8_t*)bitmap;
     int32_t *buf32;
-
-    float RS = raster_size.as_mm();
-    float LH = layer_height.as_mm();
-
-    int32_t DOD = int32_t( round( (UVstretchZ*depth_of_drive.as_mm())/LH ) );
-    int32_t BH = int32_t( round( (UVstretchZ*(type_height.as_mm()-depth_of_drive.as_mm()))/LH ) );
-
-    int32_t FZ;
-    int32_t FXY;
-
-    if (foot.mode == no_foot) {
-        FZ = 0;
-        FXY = 0;
-    }
-    else {
-        FZ = int32_t( round( (foot.Z.as_mm() * UVstretchZ)/LH ) );
-        FXY = int32_t( round( foot.XY.as_mm()/RS  ) );
-    }
-
 
     if (!loaded)
     {
         std::cerr << "ERROR: No Bitmap loaded." << std::endl;
         return -1;
     }
-
 
     glyph_rects.clear();
     body_rects.clear();
@@ -653,6 +630,54 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         }
     }
 
+    return 0;
+}
+
+
+int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float UVstretchZ)
+{
+    int x, y;
+    int i, j, k;
+    int w = bm_width;
+    int h = bm_height;
+
+    vertices.clear();
+    intvec3d_t vec3dbuf = (intvec3d_t) {INT32_MIN, INT32_MIN, INT32_MIN};
+    vertices.push_back(vec3dbuf); // vertex #0, as OBJ files start indexing at #1
+
+    triangles.clear();
+
+
+    float RS = raster_size.as_mm();
+    float LH = layer_height.as_mm();
+
+    int32_t DOD = int32_t( round( (UVstretchZ*depth_of_drive.as_mm())/LH ) );
+    int32_t BH = int32_t( round( (UVstretchZ*(type_height.as_mm()-depth_of_drive.as_mm()))/LH ) );
+
+    int32_t FZ;
+    int32_t FXY;
+
+    if (foot.mode == no_foot) {
+        FZ = 0;
+        FXY = 0;
+    }
+    else {
+        FZ = int32_t( round( (foot.Z.as_mm() * UVstretchZ)/LH ) );
+        FXY = int32_t( round( foot.XY.as_mm()/RS  ) );
+    }
+
+
+    if (find_rectangles() <0)
+        return -1;
+
+
+    if (!loaded)
+    {
+        std::cerr << "ERROR: No Bitmap loaded." << std::endl;
+        return -1;
+    }
+
+    int32_t *buf32 = tag_bitmap_i32;
 
     // normal vectors: X, Y, Z, positive, negative
     intvec3d_t Xp = (intvec3d_t){ 1,  0,  0};  intvec3d_t Xn = (intvec3d_t){-1,  0,  0};
@@ -870,12 +895,6 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         OBJ_rect_push(Zn, ubl, lbr, ubr, lbl);
     }
 
-
-    if (tag_bitmap_i32 != NULL)
-        free(tag_bitmap_i32);
-    tag_bitmap_i32 = NULL;
-
-
     return 0;
 }
 
@@ -908,9 +927,6 @@ int TypeBitmap::writeOBJ(std::string filename)
     obj_out << std::endl << "# Vertices with coordinates in mm:" << std::endl;
     for (i=1; i<vertices.size(); i++) {
         intvec3d_t vertex = vertices[i];
-        int32_t x_0um1 = int32_t(round(vertex.x * RS * 10000));
-        int32_t y_0um1 = int32_t(round(vertex.y * RS * 10000));
-        int32_t z_0um1 = int32_t(round(vertex.z * LH * 10000));
         float x = vertex.x * RS;
         float y = vertex.y * RS;
         float z = vertex.z * LH;
@@ -919,9 +935,6 @@ int TypeBitmap::writeOBJ(std::string filename)
                 << x << " "
                 << y << " "
                 << z << " "
-//                << (x_0um1 / 10000) << "." << abs(x_0um1 % 10000) << " "    /* doesnt work without leading 0s on fractions*/
-//                << (y_0um1 / 10000) << "." << abs(y_0um1 % 10000) << " "
-//                << (z_0um1 / 10000) << "." << abs(z_0um1 % 10000) << " "
                 << std::endl;
     }
 
@@ -1001,43 +1014,6 @@ int TypeBitmap::writeSTL(std::string filename)
     stl_out.close();
 
 
-
-
-
-/*
-    obj_out << "### OBJ data exported from t3t_pbm2stl:" << std::endl;
-
-    obj_out << std::endl << "# Vertices with coordinates in mm:" << std::endl;
-    for (i=1; i<vertices.size(); i++) {
-        intvec3d_t vertex = vertices[i];
-        int32_t x_0um1 = int32_t(round(vertex.x * RS * 10000));
-        int32_t y_0um1 = int32_t(round(vertex.y * RS * 10000));
-        int32_t z_0um1 = int32_t(round(vertex.z * LH * 10000));
-        float x = vertex.x * RS;
-        float y = vertex.y * RS;
-        float z = vertex.z * LH;
-
-        obj_out << "v "
-                << x << " "
-                << y << " "
-                << z << " "
-//                << (x_0um1 / 10000) << "." << abs(x_0um1 % 10000) << " "
-//                << (y_0um1 / 10000) << "." << abs(y_0um1 % 10000) << " "
-//                << (z_0um1 / 10000) << "." << abs(z_0um1 % 10000) << " "
-                << std::endl;
-    }
-
-    obj_out << std::endl << "# Triangles by vertex number:" << std::endl;
-    for (i=0; i<triangles.size(); i++) {
-        mesh_triangle triangle = triangles[i];
-        obj_out << "f "
-                << triangle.v1 << " "
-                << triangle.v2 << " "
-                << triangle.v3 << " "
-                << std::endl;
-    }
-    obj_out.close();
-*/
     std::cout << "Wrote binary STL data to " << filename << std::endl;
     std::cout << "---------------------" << std::endl;
     std::cout << "Exported STL metrics:" << std::endl;

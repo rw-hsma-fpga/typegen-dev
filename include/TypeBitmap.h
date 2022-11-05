@@ -57,6 +57,8 @@ class TypeBitmap {
                        intvec3d_t v1, intvec3d_t v2,
                        intvec3d_t v3, intvec3d_t v4);
 
+    int find_rectangles(void);
+
     uint32_t find_or_add_vertex(intvec3d_t v);
 
 
