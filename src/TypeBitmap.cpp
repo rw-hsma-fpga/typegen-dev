@@ -806,29 +806,30 @@ int TypeBitmap::generateMesh(reduced_foot foot, float UVstretchZ)
 
     }
 
-    // TODO: CREATE ACCURATE NORMALS
     if (foot.mode == bevel) { // beveled foot
         utl = (intvec3d_t){0,  0, -(BH-FZ)};
         utr = (intvec3d_t){w,  0, -(BH-FZ)};
         ubl = (intvec3d_t){0, -h, -(BH-FZ)};
         ubr = (intvec3d_t){w, -h, -(BH-FZ)};
-/*
+
+        intvec3d_t N;
+        N.z = -FXY;
+
         // left face
-        STL_triangle_write(obj_out, LD, ubl, utl, ltl, tri_cnt);
-        STL_triangle_write(obj_out, LD, ubl, ltl, lbl, tri_cnt);
+        N.x = -FZ; N.y = 0 ;
+        OBJ_rect_push(N, ubl, utl, ltl, lbl);
 
         // right face
-        STL_triangle_write(obj_out, RD, ubr, ltr, utr, tri_cnt);
-        STL_triangle_write(obj_out, RD, ubr, lbr, ltr, tri_cnt);
+        N.x = FZ; N.y = 0 ;
+        OBJ_rect_push(N, ubr, ltr, utr, lbr);
 
         // top face
-        STL_triangle_write(obj_out, TD, utl, utr, ltr, tri_cnt);
-        STL_triangle_write(obj_out, TD, utl, ltr, ltl, tri_cnt);
+        N.y = FZ; N.x = 0 ;
+        OBJ_rect_push(N, utl, utr, ltr, ltl);
 
         // bottom face
-        STL_triangle_write(obj_out, BD, ubl, lbr, ubr, tri_cnt);
-        STL_triangle_write(obj_out, BD, ubl, lbl, lbr, tri_cnt);
-*/
+        N.y = -FZ; N.y = 0 ;
+        OBJ_rect_push(N, ubl, lbr, ubr, lbl);
     }
 
     // bevel/step foot
