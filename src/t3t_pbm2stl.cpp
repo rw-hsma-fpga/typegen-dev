@@ -20,8 +20,8 @@ struct {
     dim_t layer_height;
 
     reduced_foot foot;
-    dim_t reduced_foot_XY;
-    dim_t reduced_foot_Z;
+
+    std::vector<nick> nicks;
 
     std::string pbm_path;
     std::string stl_path;
@@ -94,7 +94,7 @@ int main(int ac, char* av[])
 
         TBM->load(pbm_path);
 
-        TBM->generateMesh(opts.foot, UVstretchZ);
+        TBM->generateMesh(opts.foot, opts.nicks, UVstretchZ);
 
         TBM->writeOBJ(obj_path);
         TBM->writeSTL(stl_path);
@@ -182,6 +182,56 @@ int parse_options(int ac, char* av[])
         get_yaml_dim_node(config, "reduced foot Z", opts.foot.Z);
 
         if (config["nicks"]) {
+            dim_t nick_scale;
+            if (config["nicks"]["scale"]) {
+                YAML::Node nicks = config["nicks"];
+                get_yaml_dim_node(nicks, "scale", nick_scale);
+                if (nicks["segments"]) {
+                    YAML::Node nicksegs = nicks["segments"];
+                    for (int i=0; i<nicksegs.size(); i++) {
+                        std::string nick_type;
+                        float z = 0, y = 0;
+                        nick current_nick;
+
+                        if (nicksegs[i]["type"])
+                            nick_type = nicksegs[i]["type"].as<std::string>();
+                        if (nick_type == "flat")
+                            current_nick.type = flat;
+                        if (nick_type == "triangle")
+                            current_nick.type = triangle;
+                        if (nick_type == "rect")
+                            current_nick.type = rect;
+                        if (nick_type == "semicirc")
+                            current_nick.type = semicirc;
+
+                        if (current_nick.type == nick_undefined) {
+                            std::cerr << "WARNING: No valid nick type specified" << std::endl;
+                            continue;
+                        }
+
+                        if (nicksegs[i]["z"]) {
+                            z = nicksegs[i]["z"].as<float>();
+                            current_nick.z = dim_t(z * nick_scale.as_mm(), mm);
+                        }
+                        if (current_nick.z.as_mm() == 0) {
+                            std::cerr << "WARNING: Nick with no height specified" << std::endl;
+                            continue;
+                        }
+                            
+                        if (nicksegs[i]["y"]) {
+                            y = nicksegs[i]["y"].as<float>();
+                            current_nick.y = dim_t(y * nick_scale.as_mm(), mm);
+                        }
+                        if ((current_nick.type == rect) && 
+                            (current_nick.y.as_mm() == 0) ) {
+                            std::cerr << "WARNING: Rectangular nick with no depth specified" << std::endl;
+                            continue;
+                        }
+
+                        opts.nicks.push_back(current_nick);
+                    }
+                }
+            }
         }
 
         // REDUCED FOOT PARAMETERS
@@ -194,6 +244,24 @@ int parse_options(int ac, char* av[])
             else
                 opts.foot.mode = no_foot;
         }
+
+        // TODO: SANITY CHECK FOR TYPE HEIGHT
+        float body_bottom_margin_mm = 0.5;
+        float body_top_strip_mm = 1.0; // needed to connect cleanly w/ type surface
+
+        float height_sum_mm = body_top_strip_mm + body_bottom_margin_mm
+                              + opts.depth_of_drive.as_mm() + opts.foot.Z.as_mm();
+        for (int i=0; i<opts.nicks.size(); i++) {
+            height_sum_mm += opts.nicks[i].z.as_mm();
+        }
+
+        if (height_sum_mm > opts.type_height.as_mm()) {
+            std::cerr << "ERROR: Specified type height components (Depth of drive, margins, nicks, reduced foot)" << std::endl
+                      << "       bigger than specified Type Height" << std::endl;
+            // TODO: List components
+            exit(1);
+        }
+
 
         // WORKING DIRECTORY
         if (config["working directory"]) {

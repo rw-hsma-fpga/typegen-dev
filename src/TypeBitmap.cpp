@@ -452,7 +452,7 @@ uint32_t TypeBitmap::find_or_add_vertex(intvec3d_t v)
 }
 
 
-int TypeBitmap::generateMesh(reduced_foot foot, float UVstretchZ)
+int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float UVstretchZ)
 {
     int x, y;
     int i, j, k;

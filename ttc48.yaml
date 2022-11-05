@@ -24,11 +24,11 @@ characters:
    - 0x2019
    # apostrophe used by the TTC
 
-nicks: # should start and end with flat 1mm
+nicks: 
   scale:
     value: 1.00
     unit: mm
-  segments:
+  segments: # should start and end with flat 1mm for now
     - type: flat
       z: 1.0
     - type: triangle
