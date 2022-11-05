@@ -695,6 +695,7 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
 
 
     // LARGE RECTS 
+    // body top surface
     for (i = 0; i < body_rects.size(); i++) {
             STLrect R = body_rects[i];
 
@@ -706,6 +707,7 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
             OBJ_rect_push(Zp, ltr, lbl, ltl, lbr);
     }
 
+    // glyph top surface
     for (i = 0; i < glyph_rects.size(); i++) {
             STLrect R = glyph_rects[i];
 
@@ -803,70 +805,7 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
     OBJ_rect_push(Yn, ubl, lbr, ubr, lbl);
 
 
-    // lower(lowest) face - bevel/step foot
-    if ((foot.mode == step) || (foot.mode == bevel)) {
-        ltl = (intvec3d_t){FXY,         -FXY, -BH};
-        ltr = (intvec3d_t){w - FXY,     -FXY, -BH};
-        lbl = (intvec3d_t){FXY,     -h + FXY, -BH};
-        lbr = (intvec3d_t){w - FXY, -h + FXY, -BH};
-    }
 
-    if (foot.mode == step) { // stepped foot
-        utl = (intvec3d_t){FXY,         -FXY, -(BH-FZ)};
-        utr = (intvec3d_t){w - FXY,     -FXY, -(BH-FZ)};
-        ubl = (intvec3d_t){FXY,     -h + FXY, -(BH-FZ)};
-        ubr = (intvec3d_t){w - FXY, -h + FXY, -(BH-FZ)};
-
-        // left face
-        OBJ_rect_push(Xn, ubl, utl, ltl, lbl);
-
-        // right face
-        OBJ_rect_push(Xp, ubr, ltr, utr, lbr);
-
-        // top face
-        OBJ_rect_push(Yp, utl, utr, ltr, ltl);
-
-        // bottom face
-        OBJ_rect_push(Yn, ubl, lbr, ubr, lbl);
-
-    }
-
-    if (foot.mode == bevel) { // beveled foot
-        utl = (intvec3d_t){0,  0, -(BH-FZ)};
-        utr = (intvec3d_t){w,  0, -(BH-FZ)};
-        ubl = (intvec3d_t){0, -h, -(BH-FZ)};
-        ubr = (intvec3d_t){w, -h, -(BH-FZ)};
-
-        intvec3d_t N;
-        N.z = -FXY;
-
-        // left face
-        N.x = -FZ; N.y = 0 ;
-        OBJ_rect_push(N, ubl, utl, ltl, lbl);
-
-        // right face
-        N.x = FZ; N.y = 0 ;
-        OBJ_rect_push(N, ubr, ltr, utr, lbr);
-
-        // top face
-        N.y = FZ; N.x = 0 ;
-        OBJ_rect_push(N, utl, utr, ltr, ltl);
-
-        // bottom face
-        N.y = -FZ; N.y = 0 ;
-        OBJ_rect_push(N, ubl, lbr, ubr, lbl);
-    }
-
-    // bevel/step foot
-    if ((foot.mode == step) || (foot.mode == bevel)) {
-        ltl = (intvec3d_t){FXY,         -FXY, -BH};
-        ltr = (intvec3d_t){w - FXY,     -FXY, -BH};
-        lbl = (intvec3d_t){FXY,     -h + FXY, -BH};
-        lbr = (intvec3d_t){w - FXY, -h + FXY, -BH};
-    }
-
-    // lower face - prepared XY coordinates differ between foot.mode "no_foot" and "bevel/step"
-    OBJ_rect_push(Zn, ltr, lbl, ltl, lbr);
 
     if (foot.mode == step) { // stepped foot
         // downlooking faces around step rim
@@ -894,6 +833,83 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         // bottom downward face
         OBJ_rect_push(Zn, ubl, lbr, ubr, lbl);
     }
+
+
+    if (foot.mode == step) { // stepped foot
+        utl = (intvec3d_t){FXY,         -FXY, -(BH-FZ)};
+        utr = (intvec3d_t){w - FXY,     -FXY, -(BH-FZ)};
+        ubl = (intvec3d_t){FXY,     -h + FXY, -(BH-FZ)};
+        ubr = (intvec3d_t){w - FXY, -h + FXY, -(BH-FZ)};
+
+        ltl = (intvec3d_t){FXY,         -FXY, -BH};
+        ltr = (intvec3d_t){w - FXY,     -FXY, -BH};
+        lbl = (intvec3d_t){FXY,     -h + FXY, -BH};
+        lbr = (intvec3d_t){w - FXY, -h + FXY, -BH};
+
+        // left face
+        OBJ_rect_push(Xn, ubl, utl, ltl, lbl);
+
+        // right face
+        OBJ_rect_push(Xp, ubr, ltr, utr, lbr);
+
+        // top face
+        OBJ_rect_push(Yp, utl, utr, ltr, ltl);
+
+        // bottom face
+        OBJ_rect_push(Yn, ubl, lbr, ubr, lbl);
+
+    }
+
+    if (foot.mode == bevel) { // beveled foot
+        utl = (intvec3d_t){0,  0, -(BH-FZ)};
+        utr = (intvec3d_t){w,  0, -(BH-FZ)};
+        ubl = (intvec3d_t){0, -h, -(BH-FZ)};
+        ubr = (intvec3d_t){w, -h, -(BH-FZ)};
+
+        ltl = (intvec3d_t){FXY,         -FXY, -BH};
+        ltr = (intvec3d_t){w - FXY,     -FXY, -BH};
+        lbl = (intvec3d_t){FXY,     -h + FXY, -BH};
+        lbr = (intvec3d_t){w - FXY, -h + FXY, -BH};
+
+        intvec3d_t N;
+        N.z = -FXY;
+
+        // left face
+        N.x = -FZ; N.y = 0 ;
+        OBJ_rect_push(N, ubl, utl, ltl, lbl);
+
+        // right face
+        N.x = FZ; N.y = 0 ;
+        OBJ_rect_push(N, ubr, ltr, utr, lbr);
+
+        // top face
+        N.y = FZ; N.x = 0 ;
+        OBJ_rect_push(N, utl, utr, ltr, ltl);
+
+        // bottom face
+        N.y = -FZ; N.y = 0 ;
+        OBJ_rect_push(N, ubl, lbr, ubr, lbl);
+    }
+
+
+    // LOWER SURFACE
+
+    // bevel/step foot
+    if ((foot.mode == step) || (foot.mode == bevel)) {
+        ltl = (intvec3d_t){FXY,         -FXY, -BH};
+        ltr = (intvec3d_t){w - FXY,     -FXY, -BH};
+        lbl = (intvec3d_t){FXY,     -h + FXY, -BH};
+        lbr = (intvec3d_t){w - FXY, -h + FXY, -BH};
+    }
+    else {
+        ltl = (intvec3d_t){0,  0, -BH};
+        ltr = (intvec3d_t){w,  0, -BH};
+        lbl = (intvec3d_t){0, -h, -BH};
+        lbr = (intvec3d_t){w, -h, -BH};
+    }
+
+    // lower face - prepared XY coordinates differ between foot.mode "no_foot" and "bevel/step"
+    OBJ_rect_push(Zn, ltr, lbl, ltl, lbr);    
 
     return 0;
 }
