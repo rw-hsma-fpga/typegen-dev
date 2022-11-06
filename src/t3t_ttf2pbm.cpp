@@ -178,13 +178,18 @@ int main(int ac, char* av[])
         int char_left_start = slot->bitmap_left;
         int char_top_start = typetop_to_baseline_px - slot->bitmap_top; // corrected stuff
 
+        // TEMPORARY
+//        TypeBitmap TBM((uint32_t)glyph_width_px, // based on scaled-up dpi (advanceX)
+//                                body_size_px); //based on uncorrected dpi (ptsize)
+//        TBM.pasteGlyph((uint8_t *)(slot->bitmap.buffer),
+//                        glyph_width_px, glyph_height_px,
+//                        char_top_start, 0);
+        // END TEMPORARY
 
-
-        TypeBitmap TBM((uint32_t)set_width_px /*based on scaled-up dpi (advanceX) */,
-                                body_size_px /*based on uncorrected dpi (ptsize) */);
-
-        TBM.pasteGlyph((uint8_t *)(slot->bitmap.buffer), \
-                        glyph_width_px, glyph_height_px, \
+        TypeBitmap TBM((uint32_t)set_width_px,  // based on scaled-up dpi (advanceX)
+                                body_size_px); //based on uncorrected dpi (ptsize)
+        TBM.pasteGlyph((uint8_t *)(slot->bitmap.buffer), 
+                        glyph_width_px, glyph_height_px, 
                         char_top_start, char_left_start);
 
         TBM.threshold(BW_THRESHOLD);
