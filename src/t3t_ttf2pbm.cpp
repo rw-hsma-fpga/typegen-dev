@@ -200,6 +200,7 @@ int main(int ac, char* av[])
             sprintf(hexstring,"/U+%04x",current_char);
             output_path = opts.work_path + std::string(hexstring) + ".pbm";
         }
+        //std::cout << "Storing " << output_path << std::endl;
         TBM.store(output_path);
             
     }
@@ -301,13 +302,19 @@ int parse_options(int ac, char* av[])
 
             if (chars["ASCII"]) {
                 std::string characters = chars["ASCII"].as<std::string>();
-                for(int i=0; i< characters.size(); i++)
+                for(int i=0; i< characters.size(); i++) {
+                    //std::cout << "Unicode in config: " << (uint32_t)characters[i] << std::endl;
                     opts.characters.push_back((uint32_t)characters[i]);
+
+                }
             }
 
             if (chars["unicode"]) {
-                for(int i=0; i<  chars["unicode"].size(); i++)
-                    opts.characters.push_back((uint32_t)chars["unicode"][i].as<int>());
+                for(int i=0; i<  chars["unicode"].size(); i++) {
+                    uint32_t unicode = chars["unicode"][i].as<unsigned int>();
+                    //std::cout << "Unicode in config: " << unicode << std::endl;
+                    opts.characters.push_back(unicode);
+                }
             }
         }
 

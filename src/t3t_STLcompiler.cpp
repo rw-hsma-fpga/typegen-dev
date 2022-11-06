@@ -102,7 +102,8 @@ int main()
             inputSTL.filename = workdir + "/" + line[k] + ".stl";
             ifstream stl_in(inputSTL.filename) ;
             if (!stl_in.is_open()) {
-                std::cerr << "ERROR: Could not open STL file for reading." << std::endl;
+                std::cerr << "ERROR: Could not open STL file " << inputSTL.filename <<
+                " for reading." << std::endl;
                 continue;
             }
             stl_in.seekg(80);

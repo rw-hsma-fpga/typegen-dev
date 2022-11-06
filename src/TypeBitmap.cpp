@@ -634,7 +634,7 @@ int TypeBitmap::find_rectangles(void)
 }
 
 
-int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float UVstretchZ)
+int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float UVstretchXY, float UVstretchZ)
 {
     int x, y;
     int i, j, k;
@@ -684,11 +684,6 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
     intvec3d_t Yp = (intvec3d_t){ 0,  1,  0};  intvec3d_t Yn = (intvec3d_t){ 0, -1,  0};
     intvec3d_t Zp = (intvec3d_t){ 0,  0,  1};  intvec3d_t Zn = (intvec3d_t){ 0,  0, -1};
 
-    // normal vectors: - 45 degrees downwards
-    intvec3d_t LD = (intvec3d_t){-1,  0, -1}; // left down
-    intvec3d_t RD = (intvec3d_t){ 1,  0, -1}; // right down
-    intvec3d_t TD = (intvec3d_t){ 0,  1, -1}; // top down
-    intvec3d_t BD = (intvec3d_t){ 0, -1, -1}; // bottom down
 
     // cube corners: upper/lower;top/botton;left/right
     intvec3d_t utl, utr, ubl, ubr, ltl, ltr, lbl, lbr;
@@ -777,34 +772,194 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
     }
 
 
+    int32_t BLC = 0; // body layer count
 
-    // BODY
+    // BODY TOP STRIP - constant 1mm for now
+    int32_t TS = int32_t(round(2 * UVstretchZ) / LH);
 
-    // type body cube corners - assuming cube goes down from Z=0 to Z=-(type height - depth of drive)
+    utl = (intvec3d_t){0,  0, -BLC};
+    utr = (intvec3d_t){w,  0, -BLC};
+    ubl = (intvec3d_t){0, -h, -BLC};
+    ubr = (intvec3d_t){w, -h, -BLC};
 
-    utl = (intvec3d_t){0,  0, 0};
-    utr = (intvec3d_t){w,  0, 0};
-    ubl = (intvec3d_t){0, -h, 0};
-    ubr = (intvec3d_t){w, -h, 0};
+    ltl = (intvec3d_t){0,  0, -(BLC+TS)};
+    ltr = (intvec3d_t){w,  0, -(BLC+TS)};
+    lbl = (intvec3d_t){0, -h, -(BLC+TS)};
+    lbr = (intvec3d_t){w, -h, -(BLC+TS)};
+
+    OBJ_rect_push(Xn, ubl, utl, ltl, lbl); // left face
+    OBJ_rect_push(Xp, ubr, ltr, utr, lbr); // right face
+    OBJ_rect_push(Yp, utl, utr, ltr, ltl); // top face
+    OBJ_rect_push(Yn, ubl, lbr, ubr, lbl); // bottom face
+
+    BLC += TS;
+
+    // NICK LAYERS
+    for (int i; i< nicks.size(); i++) {
+        // NICK HEIGHT
+        int32_t NH = int32_t(round(nicks[i].z.as_mm() * UVstretchZ) / LH);
+
+        // TRIANGLE DEPTH - half of height
+        int32_t TD = int32_t(round((nicks[i].z.as_mm()/2) * UVstretchXY) / RS);
+
+        // RECT DEPTH
+        int32_t RD = int32_t(round(nicks[i].y.as_mm() * UVstretchXY) / RS);
+
+        if (nicks[i].type == rect) {
+            // RECT SEGMENT
+            utl = (intvec3d_t){0,  0, -BLC};
+            utr = (intvec3d_t){w,  0, -BLC};
+            ubl = (intvec3d_t){0, -(h-RD), -BLC};
+            ubr = (intvec3d_t){w, -(h-RD), -BLC};
+
+            ltl = (intvec3d_t){0,  0, -(BLC+NH)};
+            ltr = (intvec3d_t){w,  0, -(BLC+NH)};
+            lbl = (intvec3d_t){0, -(h-RD), -(BLC+NH)};
+            lbr = (intvec3d_t){w, -(h-RD), -(BLC+NH)};
+
+            OBJ_rect_push(Xn, ubl, utl, ltl, lbl); // left face
+            OBJ_rect_push(Xp, ubr, ltr, utr, lbr); // right face
+            OBJ_rect_push(Yp, utl, utr, ltr, ltl); // top face
+            OBJ_rect_push(Yn, ubl, lbr, ubr, lbl); // bottom face
+            
+            utl = (intvec3d_t){0, -(h-RD), -BLC};
+            utr = (intvec3d_t){w, -(h-RD), -BLC};
+            ubl = (intvec3d_t){0, -h, -BLC};
+            ubr = (intvec3d_t){w, -h, -BLC};
+
+            ltl = (intvec3d_t){0, -(h-RD), -(BLC+NH)};
+            ltr = (intvec3d_t){w, -(h-RD), -(BLC+NH)};
+            lbl = (intvec3d_t){0, -h, -(BLC+NH)};
+            lbr = (intvec3d_t){w, -h, -(BLC+NH)};
+
+            OBJ_rect_push(Zn, utl, utr, ubl, ubr); // downward-looking upper face of nick
+            OBJ_rect_push(Zp, ltl, ltr, lbl, lbr); // upward-looking lower face of nick
+        }
+        else if (nicks[i].type == triangle) {
+            // TRIANGLE SEGMENT
+            utl = (intvec3d_t){0,  0, -BLC};
+            utr = (intvec3d_t){w,  0, -BLC};
+            ubl = (intvec3d_t){0, -h, -BLC};
+            ubr = (intvec3d_t){w, -h, -BLC};
+
+            ltl = (intvec3d_t){0,  0, -(BLC+(NH/2))};
+            ltr = (intvec3d_t){w,  0, -(BLC+(NH/2))};
+            lbl = (intvec3d_t){0, -(h-TD), -(BLC+(NH/2))};
+            lbr = (intvec3d_t){w, -(h-TD), -(BLC+(NH/2))};
+
+            intvec3d_t YnZn = (intvec3d_t){ 0,  -1,  -1};
+            intvec3d_t YnZp = (intvec3d_t){ 0,  -1,   1};
+
+            OBJ_rect_push(Xn, ubl, utl, ltl, lbl); // left face
+            OBJ_rect_push(Xp, ubr, ltr, utr, lbr); // right face
+            OBJ_rect_push(Yp, utl, utr, ltr, ltl); // top face
+            OBJ_rect_push(YnZn, ubl, lbr, ubr, lbl); // bottom face
+            
+            utl = (intvec3d_t){0,  0, -(BLC+(NH/2))};
+            utr = (intvec3d_t){w,  0, -(BLC+(NH/2))};
+            ubl = (intvec3d_t){0, -(h-TD), -(BLC+(NH/2))};
+            ubr = (intvec3d_t){w, -(h-TD), -(BLC+(NH/2))};
+
+            ltl = (intvec3d_t){0,  0, -(BLC+NH)};
+            ltr = (intvec3d_t){w,  0, -(BLC+NH)};
+            lbl = (intvec3d_t){0, -h, -(BLC+NH)};
+            lbr = (intvec3d_t){w, -h, -(BLC+NH)};
+
+            OBJ_rect_push(Xn, ubl, utl, ltl, lbl); // left face
+            OBJ_rect_push(Xp, ubr, ltr, utr, lbr); // right face
+            OBJ_rect_push(Yp, utl, utr, ltr, ltl); // top face
+            OBJ_rect_push(YnZp, ubl, lbr, ubr, lbl); // bottom face
+        }
+        else if (nicks[i].type == circle) {
+
+            float twoPi = 8*atan(1);
+            float Pi = 4*atan(1);
+            float halfPi = 2*atan(1);
+
+            const int32_t circle_segs = 10;
+
+            for (int j=0; j< circle_segs; j++) {
+
+                // TODO make special cases for first and last to avoid rounding-error integer shift
+                float start_angle = j*(Pi/circle_segs);
+                float end_angle   = (j+1)*(Pi/circle_segs);
+
+                float start_zf = -((cos(start_angle)-1)/2) * nicks[i].z.as_mm() * UVstretchZ;  // 0.0..-1.0
+                float end_zf   = -((cos(end_angle  )-1)/2) * nicks[i].z.as_mm() * UVstretchZ;  // 0.0..-1.0
+                int32_t start_z = int32_t(round(start_zf/LH));
+                int32_t end_z   = int32_t(round(end_zf/LH));
+                if (j==0)
+                    start_z==0;
+                if (start_z > NH)
+                    start_z = NH;
+                if (end_z > NH)
+                    end_z = NH;
+
+                float start_yf = sin(start_angle) * (nicks[i].z.as_mm()/2) * UVstretchXY;
+                float end_yf   = sin(end_angle) * (nicks[i].z.as_mm()/2) * UVstretchXY;
+                int32_t start_y = int32_t(round(start_yf/RS));
+                int32_t end_y   = int32_t(round(end_yf/RS));
+
+                // MAKE N
+                intvec3d_t Nang = (intvec3d_t) { 0,  -(end_z-start_z), -(end_y-start_y)};
+
+                utl = (intvec3d_t){0,  0, -(BLC+start_z)};
+                utr = (intvec3d_t){w,  0, -(BLC+start_z)};
+                ubl = (intvec3d_t){0, -(h-start_y), -(BLC+start_z)};
+                ubr = (intvec3d_t){w, -(h-start_y), -(BLC+start_z)};
+
+                ltl = (intvec3d_t){0,  0, -(BLC+end_z)};
+                ltr = (intvec3d_t){w,  0, -(BLC+end_z)};
+                lbl = (intvec3d_t){0, -(h-end_y), -(BLC+end_z)};
+                lbr = (intvec3d_t){w, -(h-end_y), -(BLC+end_z)};
+
+                OBJ_rect_push(Xn, ubl, utl, ltl, lbl); // left face
+                OBJ_rect_push(Xp, ubr, ltr, utr, lbr); // right face
+                OBJ_rect_push(Yp, utl, utr, ltr, ltl); // top face
+                OBJ_rect_push(Nang, ubl, lbr, ubr, lbl); // bottom face
+            }
+        }
+        else {
+            // FLAT SEGMENT - TODO TODO OTHER SEGMENTS
+            utl = (intvec3d_t){0,  0, -BLC};
+            utr = (intvec3d_t){w,  0, -BLC};
+            ubl = (intvec3d_t){0, -h, -BLC};
+            ubr = (intvec3d_t){w, -h, -BLC};
+
+            ltl = (intvec3d_t){0,  0, -(BLC+NH)};
+            ltr = (intvec3d_t){w,  0, -(BLC+NH)};
+            lbl = (intvec3d_t){0, -h, -(BLC+NH)};
+            lbr = (intvec3d_t){w, -h, -(BLC+NH)};
+
+            OBJ_rect_push(Xn, ubl, utl, ltl, lbl); // left face
+            OBJ_rect_push(Xp, ubr, ltr, utr, lbr); // right face
+            OBJ_rect_push(Yp, utl, utr, ltr, ltl); // top face
+            OBJ_rect_push(Yn, ubl, lbr, ubr, lbl); // bottom face
+
+        }
+
+        BLC += NH;
+    }
+
+
+
+    // BODY BOTTOM STRIP (above reduced foot, if exists)
+    utl = (intvec3d_t){0,  0, -BLC};
+    utr = (intvec3d_t){w,  0, -BLC};
+    ubl = (intvec3d_t){0, -h, -BLC};
+    ubr = (intvec3d_t){w, -h, -BLC};
 
     ltl = (intvec3d_t){0,  0, -(BH-FZ)};
     ltr = (intvec3d_t){w,  0, -(BH-FZ)};
     lbl = (intvec3d_t){0, -h, -(BH-FZ)};
     lbr = (intvec3d_t){w, -h, -(BH-FZ)};
 
-    // left face
-    OBJ_rect_push(Xn, ubl, utl, ltl, lbl);
+    OBJ_rect_push(Xn, ubl, utl, ltl, lbl); // left face
+    OBJ_rect_push(Xp, ubr, ltr, utr, lbr); // right face
+    OBJ_rect_push(Yp, utl, utr, ltr, ltl); // top face
+    OBJ_rect_push(Yn, ubl, lbr, ubr, lbl); // bottom face
 
-    // right face
-    OBJ_rect_push(Xp, ubr, ltr, utr, lbr);
-
-    // top face
-    OBJ_rect_push(Yp, utl, utr, ltr, ltl);
-
-    // bottom face
-    OBJ_rect_push(Yn, ubl, lbr, ubr, lbl);
-
-
+    // REDUCED FOOT (if exists)
 
 
     if (foot.mode == step) { // stepped foot
@@ -901,7 +1056,7 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         lbl = (intvec3d_t){FXY,     -h + FXY, -BH};
         lbr = (intvec3d_t){w - FXY, -h + FXY, -BH};
     }
-    else {
+    else { // no reduced foot
         ltl = (intvec3d_t){0,  0, -BH};
         ltr = (intvec3d_t){w,  0, -BH};
         lbl = (intvec3d_t){0, -h, -BH};

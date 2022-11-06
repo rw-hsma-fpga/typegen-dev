@@ -31,9 +31,10 @@ struct {
 
     std::vector<uint32_t> characters;
 
+    float XYshrink_pct;
     float Zshrink_pct;
 
-} opts = { .create_work_path = false, .Zshrink_pct = 0 };
+} opts = { .create_work_path = false, .XYshrink_pct = 0, .Zshrink_pct = 0 };
 
 
 int parse_options(int ac, char* av[]);
@@ -46,6 +47,7 @@ int main(int ac, char* av[])
 
     float UVstretchZ = (float)100 / ((float)100 + opts.Zshrink_pct);
     cout << "Z stretch to compensate UV shrinking: " << UVstretchZ << endl;
+    float UVstretchXY = (float)100 / ((float)100 + opts.XYshrink_pct);
 
     if (!opts.work_path.empty()) {
         if (!fs::exists(opts.work_path)) {
@@ -94,7 +96,7 @@ int main(int ac, char* av[])
 
         TBM->load(pbm_path);
 
-        TBM->generateMesh(opts.foot, opts.nicks, UVstretchZ);
+        TBM->generateMesh(opts.foot, opts.nicks, UVstretchXY, UVstretchZ);
 
         TBM->writeOBJ(obj_path);
         TBM->writeSTL(stl_path);
@@ -201,8 +203,8 @@ int parse_options(int ac, char* av[])
                             current_nick.type = triangle;
                         if (nick_type == "rect")
                             current_nick.type = rect;
-                        if (nick_type == "semicirc")
-                            current_nick.type = semicirc;
+                        if (nick_type == "circle")
+                            current_nick.type = circle;
 
                         if (current_nick.type == nick_undefined) {
                             std::cerr << "WARNING: No valid nick type specified" << std::endl;
@@ -247,7 +249,7 @@ int parse_options(int ac, char* av[])
 
         // TODO: SANITY CHECK FOR TYPE HEIGHT
         float body_bottom_margin_mm = 0.5;
-        float body_top_strip_mm = 1.0; // needed to connect cleanly w/ type surface
+        float body_top_strip_mm = 2.0; // needed to connect cleanly w/ type surface
 
         float height_sum_mm = body_top_strip_mm + body_bottom_margin_mm
                               + opts.depth_of_drive.as_mm() + opts.foot.Z.as_mm();
@@ -287,7 +289,10 @@ int parse_options(int ac, char* av[])
             }
         }
 
-        // Z SHRINKAGE OBSERVED AND TO BE COMPENSATED FOR
+        // SHRINKAGE OBSERVED AND TO BE COMPENSATED FOR
+        if (config["XYshrink_pct"]) {
+            opts.XYshrink_pct = config["XYshrink_pct"].as<float>();
+        }
         if (config["Zshrink_pct"]) {
             opts.Zshrink_pct = config["Zshrink_pct"].as<float>();
         }

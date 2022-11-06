@@ -14,8 +14,10 @@ working directory:
 
 # rows
 structure:
-  - _1c _1b _1a A A B . C D D _2a _2b _2c
+#  - _1c _1b _1a A A B . C D D _2a _2b _2c
+  - LG SM A A B . C D D SM_sp LG_sp
   - E E E F F . G G H H I I
-  - K L L L U+2019 T T M M N N
-  - O O O U+2019 P Q S S R R J 
-  - _3c _3b _3a U U V W Y Y _4a _4b _4c
+  - K L L L T T M M N N
+  - O P Q S S R R J 
+  - LG_sp SM_sp U U V W Y Y X Z SM LG
+#  - _3c _3b _3a U U V W Y Y _4a _4b _4c

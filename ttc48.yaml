@@ -19,8 +19,8 @@ space below refchar:
   unit: mm
 
 characters:
-  ASCII: ABCDEF #HIJKLMNOPQRSTUVWXYZ.
-  unicodes:
+  ASCII: ABCDEFGHIJKLMNOPQRSTUVWXYZ.
+  unicode:
    - 0x2019
    # apostrophe used by the TTC
 
@@ -30,16 +30,15 @@ nicks:
     unit: mm
   segments: # should start and end with flat 1mm for now
     - type: flat
-      z: 1.0
+      z: 5.0
     - type: triangle
       z: 2.0
     - type: flat
-      z: 1.0
-    - type: rect
-      z: 1.0
-      y: 1.0
+      z: 3.0
+    - type: triangle
+      z: 2.0
     - type: flat
-      z: 1.0
+      z: 2.0
 
 
 

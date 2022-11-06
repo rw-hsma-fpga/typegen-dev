@@ -15,7 +15,7 @@ struct reduced_foot {
     reduced_foot() { mode = no_foot; };
 };
 
-enum nick_type{ nick_undefined, flat, triangle, rect, semicirc};
+enum nick_type{ nick_undefined, flat, triangle, rect, circle};
 
 struct nick {
     nick_type type;
@@ -80,7 +80,7 @@ class TypeBitmap {
 
         int set_type_parameters(dim_t TH, dim_t DOD, dim_t RS, dim_t LH);
 
-        int generateMesh(reduced_foot foot, std::vector<nick> &nicks, float UVstretchZ);
+        int generateMesh(reduced_foot foot, std::vector<nick> &nicks, float UVstretchXY, float UVstretchZ);
         int writeOBJ(std::string filename);
         int writeSTL(std::string filename);
 };
