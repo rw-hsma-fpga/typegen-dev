@@ -57,8 +57,16 @@ int TypeBitmap::load(std::string filename)
 
     getline(pbm, linebuf);
     std::erase(linebuf, '\r');
-    if (linebuf!="P1") {
-        std::cerr << "ERROR: Not a valid PBM ASCII file!" << std::endl;
+
+    uint8_t format;
+    if (linebuf=="P1") {
+        format = 1;
+    }
+    else if (linebuf=="P4") {
+        format = 4;
+    }
+    else {
+        std::cerr << "ERROR: Not a valid PBM file!" << std::endl;
         pbm.close();
         return -1;
     }
@@ -84,40 +92,84 @@ int TypeBitmap::load(std::string filename)
     }
 
     bitmap = (uint8_t*)calloc(size = bm_width*bm_height, sizeof(uint8_t));
-
     if (bitmap == NULL) {
         std::cerr << "ERROR: Bitmap buffer allocation failed" << std::endl;
         pbm.close();
         return -1;
     }
 
-    char c;
-    uint8_t *runbuf = bitmap;
     uint32_t count = 0;
+    uint8_t *runbuf = bitmap;
 
-    while(!pbm.eof()) {
+    // ASCII format (P1)
+    if (format==1) {
+        char c;
+
         c = pbm.get();
-        switch(c) {
-            case '#':
-                getline(pbm, linebuf); break;
-            case '0':
-            case '1':
-                if (count == size) {
-                    std::cerr << "ERROR: More data than specified." << std::endl;
-                    free(bitmap);
-                    bitmap = NULL;
-                    pbm.close();
-                    return -1;
-                }
+        while(!pbm.eof()) {
+            switch(c) {
+                case '#':
+                    getline(pbm, linebuf); break;
+                case '0':
+                case '1':
+                    if (count == size) {
+                        std::cerr << "ERROR: More data than specified." << std::endl;
+                        free(bitmap);
+                        bitmap = NULL;
+                        pbm.close();
+                        return -1;
+                    }
 
-                if (c=='1')
+                    if (c=='1')
+                        *(runbuf++) = 255;
+                    else
+                        *(runbuf++) = 0;
+
+                    count++;
+                    break;
+                default:
+                    break;
+            }
+            c = pbm.get();
+        }
+    }
+
+    // Binary format (P4)
+    if (format==4) {
+        uint8_t byte;
+        uint32_t x_cnt = 0;
+        uint32_t y_cnt = 0;
+
+        byte = (uint8_t)pbm.get(); // whitespace after height
+        
+        byte = (uint8_t)pbm.get();
+        while(!pbm.eof()) {
+            if (count >= size) { // file should have ended
+                std::cerr << "ERROR: More data than specified." << std::endl;
+                free(bitmap);
+                bitmap = NULL;
+                pbm.close();
+                return -1;
+            }
+
+            for (int i=0; i<8; i++) {
+
+                if (byte & 0x80) { // start on MSB
                     *(runbuf++) = 255;
-                else
+                }
+                else {
                     *(runbuf++) = 0;
-
+                }
+                byte <<= 1;
                 count++;
-            default:
-                break;
+                x_cnt++;
+                if (x_cnt==bm_width) {
+                    x_cnt = 0;
+                    y_cnt++;
+                    break; // don't use rest of bit
+                }
+            }
+            byte = (uint8_t)pbm.get();
         }
     }
 
