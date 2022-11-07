@@ -1,0 +1,39 @@
+# font
+font file: fonts/DeVinne.ttf
+
+working directory:
+  path: ./DeVinne48/
+  create: true
+
+body size:
+  value: 48
+  unit: pt
+
+# reference character is used to scale output to reference lead type
+reference character: X
+space above refchar:
+  value: 0.00
+  unit: mm
+space below refchar:
+  value: 0.00
+  unit: mm
+
+characters:
+  ASCII: X
+
+#nicks: 
+#  scale:
+#    value: 1.00
+#    unit: mm
+#  segments: # should start and end with flat 1mm for now
+#    - type: flat
+#      z: 5.0
+#    - type: rect
+#      z: 3.0
+#      y: 1.5
+#    - type: flat
+#      z: 2.0
+
+
+
+# font scaling mode and parameters

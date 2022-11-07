@@ -6,5 +6,8 @@
 !*.yaml
 !.gitignore
 !**/CMakeLists.txt
+!doc/
+!doc/*.png
+
 
 
