@@ -32,11 +32,15 @@ struct {
     std::vector<uint32_t> characters;
 
     float XYshrink_pct;
+    float UVstretchXY;
+
     float Zshrink_pct;
+    float UVstretchZ;
 
 } opts = { .create_work_path = false, .XYshrink_pct = 0, .Zshrink_pct = 0 };
 
 
+int generate_3D_files(TypeBitmap &TBM, std::string pbm_path, std::string stl_path, std::string obj_path);
 int parse_options(int ac, char* av[]);
 int get_yaml_dim_node(YAML::Node &parent, std::string name, dim_t &target);
 
@@ -45,9 +49,9 @@ int main(int ac, char* av[])
 {
     parse_options(ac, av);
 
-    float UVstretchZ = (float)100 / ((float)100 + opts.Zshrink_pct);
-    cout << "Z stretch to compensate UV shrinking: " << UVstretchZ << endl;
-    float UVstretchXY = (float)100 / ((float)100 + opts.XYshrink_pct);
+    opts.UVstretchZ = (float)100 / ((float)100 + opts.Zshrink_pct);
+    cout << "Z stretch to compensate UV shrinking: " << opts.UVstretchZ << endl;
+    opts.UVstretchXY = (float)100 / ((float)100 + opts.XYshrink_pct);
 
     if (!opts.work_path.empty()) {
         if (!fs::exists(opts.work_path)) {
@@ -67,40 +71,103 @@ int main(int ac, char* av[])
         opts.work_path = "./";
     } 
 
-    // TODO command line override of character list on input/output
-    for(int i=0; i<opts.characters.size(); i++) {
-
-        uint32_t current_char = opts.characters[i];
-
-        std::string pbm_path, stl_path, obj_path;
-        if (current_char < 0x80) {
-            char asciistring[3];
-            sprintf(asciistring,"/%c",current_char);
-            pbm_path = opts.work_path + std::string(asciistring) + ".pbm";
-            stl_path = opts.work_path + std::string(asciistring) + ".stl";
-            obj_path = opts.work_path + std::string(asciistring) + ".obj";
+    std::string pbm_path, stl_path, obj_path;
+    bool clPBM = false;
+    bool clworkpathPBM = false;
+    
+    if (!opts.pbm_path.empty()) { // single PBM input specified
+        if (fs::exists(opts.pbm_path)) {
+            clPBM = true;
+            pbm_path = opts.pbm_path;
+        }
+        else if (fs::exists(opts.work_path + opts.pbm_path)) {
+            clPBM = true;
+            clworkpathPBM = true;
+            pbm_path = opts.work_path + opts.pbm_path;
         }
         else {
-            char hexstring[8]; // TODO: 5-digit Unicode support?
-            sprintf(hexstring,"/U+%04x",current_char);
-            pbm_path = opts.work_path + std::string(hexstring) + ".pbm";
-            stl_path = opts.work_path + std::string(hexstring) + ".stl";
-            obj_path = opts.work_path + std::string(hexstring) + ".obj";
+            cerr << "Specified input bitmap file " << opts.pbm_path << " does not exist." << endl;
+            exit(1);
+        }
+    }
+
+    if (clPBM) {
+        if (clPBM && !opts.stl_path.empty()) {
+            if (!clworkpathPBM) {
+                stl_path = opts.stl_path;
+            }
+            else {
+                stl_path = opts.work_path + opts.stl_path;
+            }
         }
 
-        TypeBitmap *TBM = new TypeBitmap();
-        TBM->set_type_parameters(opts.type_height,
-                                opts.depth_of_drive,
-                                opts.raster_size,
-                                opts.layer_height);
+        if (clPBM && !opts.obj_path.empty()) {
+            if (!clworkpathPBM) {
+                obj_path = opts.obj_path;
+            }
+            else {
+                obj_path = opts.work_path + opts.obj_path;
+            }
+        }
 
-        TBM->load(pbm_path);
-
-        TBM->generateMesh(opts.foot, opts.nicks, UVstretchXY, UVstretchZ);
-
-        TBM->writeOBJ(obj_path);
-        TBM->writeSTL(stl_path);
+        if (opts.stl_path.empty() && opts.obj_path.empty()) {
+            stl_path = pbm_path.substr(0, pbm_path.size()-4) + ".stl";
+            obj_path = pbm_path.substr(0, pbm_path.size()-4) + ".obj";
+        }
     }
+
+    TypeBitmap TBM;
+    TBM.set_type_parameters(opts.type_height,
+                            opts.depth_of_drive,
+                            opts.raster_size,
+                            opts.layer_height);
+
+    if (clPBM) {
+        generate_3D_files(TBM, pbm_path, stl_path, obj_path);
+    }
+    else {
+        for(int i=0; i<opts.characters.size(); i++) {
+
+            uint32_t current_char = opts.characters[i];
+
+            if (current_char < 0x80) { // TODO: Special handling for special ASCII chars like space?
+                char asciistring[3];
+                sprintf(asciistring,"/%c",current_char);
+                pbm_path = opts.work_path + std::string(asciistring) + ".pbm";
+                stl_path = opts.work_path + std::string(asciistring) + ".stl";
+                obj_path = opts.work_path + std::string(asciistring) + ".obj";
+            }
+            else {
+                char hexstring[8]; // TODO: 5-digit Unicode support?
+                sprintf(hexstring,"/U+%04x",current_char);
+                pbm_path = opts.work_path + std::string(hexstring) + ".pbm";
+                stl_path = opts.work_path + std::string(hexstring) + ".stl";
+                obj_path = opts.work_path + std::string(hexstring) + ".obj";
+            }
+
+            generate_3D_files(TBM, pbm_path, stl_path, obj_path);
+        }
+    }
+    return 0;
+}
+
+
+int generate_3D_files(TypeBitmap &TBM, std::string pbm_path, std::string stl_path, std::string obj_path)
+{
+    if (TBM.load(pbm_path)<0)
+        return -1;
+
+    if (TBM.generateMesh(opts.foot, opts.nicks, opts.UVstretchXY, opts.UVstretchZ)<0)
+        return -1;
+
+    if (!stl_path.empty())
+        if (TBM.writeSTL(stl_path)<0)
+        return -1;
+
+    if (!obj_path.empty())
+        if (TBM.writeOBJ(obj_path)<0)
+        return -1;
+
     return 0;
 }
 
@@ -126,8 +193,8 @@ int parse_options(int ac, char* av[])
         desc.add_options()
             ("help", "produce this help message")
             ("pbm,p", bpo::value<std::string>(&opts.pbm_path), "specify input PBM path")
-            ("stl,s", bpo::value<std::string>(&opts.stl_path), "specify output STL path")
-            ("obj,o", bpo::value<std::string>(&opts.obj_path), "specify output OBJ path")
+            ("stl,s", bpo::value<std::string>(&opts.stl_path), "specify output STL path (only useful if PBM input specified)")
+            ("obj,o", bpo::value<std::string>(&opts.obj_path), "specify output OBJ path (only useful if PBM input specified)")
             ("yaml,y", bpo::value< vector<string> >(&yaml_paths), "specify YAML configuration file(s)")
         ;
 
@@ -158,6 +225,9 @@ int parse_options(int ac, char* av[])
         if (!opts.stl_path.empty() && !opts.stl_path.ends_with(".stl"))
             opts.stl_path.append(".stl");
 
+        if (!opts.obj_path.empty() && !opts.obj_path.ends_with(".obj"))
+            opts.obj_path.append(".obj");
+
         string yaml_config;
 
         for (string& s: yaml_paths) {
@@ -172,7 +242,6 @@ int parse_options(int ac, char* av[])
                     yaml_config += "\n";
             }
         }
-                 // TODO: Commandline arg
 
         YAML::Node config = YAML::Load(yaml_config);
 
@@ -183,6 +252,7 @@ int parse_options(int ac, char* av[])
         get_yaml_dim_node(config, "reduced foot XY", opts.foot.XY);
         get_yaml_dim_node(config, "reduced foot Z", opts.foot.Z);
 
+        // NICKS
         if (config["nicks"]) {
             dim_t nick_scale;
             if (config["nicks"]["scale"]) {

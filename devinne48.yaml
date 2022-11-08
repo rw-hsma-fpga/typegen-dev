@@ -10,7 +10,7 @@ body size:
   unit: pt
 
 # reference character is used to scale output to reference lead type
-reference character: X
+reference character: T
 space above refchar:
   value: 0.00
   unit: mm
@@ -19,7 +19,7 @@ space below refchar:
   unit: mm
 
 characters:
-  ASCII: X
+  ASCII: kLT
 
 #nicks: 
 #  scale:

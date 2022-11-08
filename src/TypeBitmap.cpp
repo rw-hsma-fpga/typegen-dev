@@ -528,7 +528,7 @@ int TypeBitmap::find_rectangles(void)
 
     tag_bitmap_i32 = (int32_t*)calloc(w*h, sizeof(int32_t));
     if (tag_bitmap_i32 == NULL) {
-        std::cerr << "ERROR: Could not open allocate tag bitmap." << std::endl;
+        std::cerr << "ERROR: Could not allocate tag bitmap." << std::endl;
         return -1;
     }
     buf32 = tag_bitmap_i32;
@@ -1139,7 +1139,7 @@ int TypeBitmap::writeOBJ(std::string filename)
 
     std::ofstream obj_out(filename, std::ios::binary);
     if (!obj_out.is_open()) {
-        std::cerr << "ERROR: Could not open OBJ file for writing." << std::endl;
+        std::cerr << "ERROR: Could not open OBJ file " << filename <<" for writing." << std::endl;
         return -1;
     }
 
@@ -1204,7 +1204,7 @@ int TypeBitmap::writeSTL(std::string filename)
 
     std::ofstream stl_out(filename, std::ios::binary);
     if (!stl_out.is_open()) {
-        std::cerr << "ERROR: Could not open STL file for writing." << std::endl;
+        std::cerr << "ERROR: Could not open STL file " << filename <<" for writing." << std::endl;
         return -1;
     }
 
