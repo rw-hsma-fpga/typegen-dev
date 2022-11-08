@@ -224,7 +224,7 @@ int parse_options(int ac, char* av[])
 
         if (vm.count("help")) {
             cout << desc << "\n";
-            return 0;
+            exit(0);
         }
 
         for (string& s: yaml_paths) {
