@@ -7,6 +7,7 @@
 #include <boost/program_options.hpp> 
 #include <sstream>
 
+
 using namespace std;
 namespace fs = std::filesystem;
 namespace bpo = boost::program_options;
@@ -30,6 +31,8 @@ struct {
         bool create_work_path;    
 
     std::vector<uint32_t> characters;
+    std::string ASCII; // for command-line input spec
+    uint32_t unicode ; // for command-line input spec; overrides ASCII
 
     float XYshrink_pct;
     float UVstretchXY;
@@ -37,9 +40,9 @@ struct {
     float Zshrink_pct;
     float UVstretchZ;
 
-} opts = { .create_work_path = false, .XYshrink_pct = 0, .Zshrink_pct = 0 };
+} opts = { .create_work_path = false, .unicode = 0, .XYshrink_pct = 0, .Zshrink_pct = 0 };
 
-
+std::string make_ASCII_Unicode_string(uint32_t);
 int generate_3D_files(TypeBitmap &TBM, std::string pbm_path, std::string stl_path, std::string obj_path);
 int parse_options(int ac, char* av[]);
 int get_yaml_dim_node(YAML::Node &parent, std::string name, dim_t &target);
@@ -74,6 +77,10 @@ int main(int ac, char* av[])
     std::string pbm_path, stl_path, obj_path;
     bool clPBM = false;
     bool clworkpathPBM = false;
+
+    if (opts.unicode) { // overrides PBM specification
+        opts.pbm_path = make_ASCII_Unicode_string(opts.unicode) + ".pbm";
+    }
     
     if (!opts.pbm_path.empty()) { // single PBM input specified
         if (fs::exists(opts.pbm_path)) {
@@ -130,25 +137,31 @@ int main(int ac, char* av[])
 
             uint32_t current_char = opts.characters[i];
 
-            if (current_char < 0x80) { // TODO: Special handling for special ASCII chars like space?
-                char asciistring[3];
-                sprintf(asciistring,"/%c",current_char);
-                pbm_path = opts.work_path + std::string(asciistring) + ".pbm";
-                stl_path = opts.work_path + std::string(asciistring) + ".stl";
-                obj_path = opts.work_path + std::string(asciistring) + ".obj";
-            }
-            else {
-                char hexstring[8]; // TODO: 5-digit Unicode support?
-                sprintf(hexstring,"/U+%04x",current_char);
-                pbm_path = opts.work_path + std::string(hexstring) + ".pbm";
-                stl_path = opts.work_path + std::string(hexstring) + ".stl";
-                obj_path = opts.work_path + std::string(hexstring) + ".obj";
-            }
+            std::string AU_string = make_ASCII_Unicode_string(current_char);
+
+            pbm_path = opts.work_path + AU_string + ".pbm";
+            stl_path = opts.work_path + AU_string + ".stl";
+            obj_path = opts.work_path + AU_string + ".obj";
 
             generate_3D_files(TBM, pbm_path, stl_path, obj_path);
         }
     }
     return 0;
+}
+
+
+std::string make_ASCII_Unicode_string(uint32_t unicode)
+{
+    if (unicode < 0x80) { // TODO: Special handling for special ASCII chars like space?
+        char asciistring[3];
+        sprintf(asciistring,"/%c", unicode);
+        return std::string(asciistring);
+    }
+    else {
+        char hexstring[8]; // TODO: 5-digit Unicode support?
+        sprintf(hexstring,"/U+%04x", unicode);
+        return std::string(hexstring);
+    }
 }
 
 
@@ -183,21 +196,24 @@ int get_yaml_dim_node(YAML::Node &parent, std::string name, dim_t &target)
     return 0;
 }
 
+
 int parse_options(int ac, char* av[])
 {
     std::vector<std::string> yaml_paths;
+    std::string unicode_arg;
 
     try {
 
         bpo::options_description desc("t3t_pbm2stl: Command-line options and arguments");
         desc.add_options()
             ("help", "produce this help message")
-            ("pbm,p", bpo::value<std::string>(&opts.pbm_path), "specify input PBM path")
-            ("stl,s", bpo::value<std::string>(&opts.stl_path), "specify output STL path (only useful if PBM input specified)")
-            ("obj,o", bpo::value<std::string>(&opts.obj_path), "specify output OBJ path (only useful if PBM input specified)")
+            ("unicode,u", bpo::value<std::string>(&unicode_arg), "specify input unicode (overrides other input args)")
+            ("ascii,a", bpo::value<std::string>(&opts.ASCII), "specify input ASCII character (overrides input PBM)")
+            ("pbm,p", bpo::value<std::string>(&opts.pbm_path), "specify input PBM path (overrides YAML)")
+            ("stl,s", bpo::value<std::string>(&opts.stl_path), "specify output STL path (only useful if input specified here)")
+            ("obj,o", bpo::value<std::string>(&opts.obj_path), "specify output OBJ path (only useful if input specified here)")
             ("yaml,y", bpo::value< vector<string> >(&yaml_paths), "specify YAML configuration file(s)")
         ;
-
         bpo::variables_map vm;        
 
         bpo::positional_options_description posopt;
@@ -251,6 +267,12 @@ int parse_options(int ac, char* av[])
         get_yaml_dim_node(config, "layer height", opts.layer_height);
         get_yaml_dim_node(config, "reduced foot XY", opts.foot.XY);
         get_yaml_dim_node(config, "reduced foot Z", opts.foot.Z);
+
+        // ASCII / Unicode args
+        if (opts.ASCII != "")
+            opts.unicode = (uint32_t)opts.ASCII[0];
+        if (!unicode_arg.empty())
+            opts.unicode = std::stoul(unicode_arg, 0, 0);
 
         // NICKS
         if (config["nicks"]) {
