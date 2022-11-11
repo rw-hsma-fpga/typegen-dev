@@ -684,9 +684,12 @@ int TypeBitmap::find_rectangles(void)
                 }
         }
 
-        if (expanded) {
-            valrect.width = valrect.right - valrect.left + 1;
-            valrect.height = valrect.bottom - valrect.top + 1;
+        valrect.width = valrect.right - valrect.left + 1;
+        valrect.height = valrect.bottom - valrect.top + 1;
+
+        //if (expanded) {
+        if ((valrect.width!=1) && (valrect.height!=1)) {
+           
 
             buf32 = tag_bitmap_i32;
             buf32 += (valrect.top*w);
@@ -1205,30 +1208,241 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
     // cube corners: upper/lower;top/botton;left/right
     intvec3d_t utl, utr, ubl, ubr, ltl, ltr, lbl, lbr;
 
+    std::vector<intvec2d_t> top_edges, right_edges, bottom_edges, left_edges; // need for connection with top ribbon - TODO
 
-    // LARGE RECTS 
+    // LARGE RECTS (min 2x2)
     // body top surface
     for (i = 0; i < body_rects.size(); i++) {
-            STLrect R = body_rects[i];
+        STLrect R = body_rects[i];
 
-            ltl = (intvec3d_t){R.left, -R.top, 0};
-            ltr = (intvec3d_t){(R.right + 1), -R.top, 0};
-            lbl = (intvec3d_t){R.left, -(R.bottom + 1), 0};
-            lbr = (intvec3d_t){(R.right + 1), -(R.bottom + 1), 0};
+        std::vector<intvec2d_t> outsides;
+        int32_t last_tag, current_tag;
 
-            push_triangles(Zp, ltr, lbl, ltl, lbr);
+        // top side
+        outsides.push_back((intvec2d_t){R.left,R.top}); //top left corner, always needed
+        if (0==R.top) { // edge
+            outsides.push_back((intvec2d_t){R.right+1,R.top});
+            // TODO add to top_edges
+        }
+        else { // iterate
+            int32_t top_x = R.left;
+            int32_t top_y = R.top - 1; // line above rect
+            last_tag = buf32[top_y * w + top_x];
+            top_x++;
+            while (top_x <= R.right) {
+                current_tag = buf32[top_y * w + top_x];
+                if ((1==abs(current_tag)) || (current_tag!=last_tag)) { // single field or changed
+                    outsides.push_back((intvec2d_t){top_x,R.top});
+                }
+                last_tag = current_tag;
+                top_x++;
+            }
+        }
+
+        // right side
+        outsides.push_back((intvec2d_t){R.right+1,R.top}); //top right corner, always needed
+        if (w-1==R.right) { // edge
+            outsides.push_back((intvec2d_t){R.right+1,R.bottom+1});
+            // TODO add to right_edges
+        }
+        else { // iterate
+            int32_t right_x = R.right + 1;  // line right of rect
+            int32_t right_y = R.top;
+            last_tag = buf32[right_y * w + right_x];
+            right_y++;
+            while (right_y <= R.bottom) {
+                current_tag = buf32[right_y * w + right_x];
+                if ((1==abs(current_tag)) || (current_tag!=last_tag)) { // single field or changed
+                    outsides.push_back((intvec2d_t){R.right+1,right_y});
+                }
+                last_tag = current_tag;
+                right_y++;
+            }
+        }
+
+        // bottom side
+        outsides.push_back((intvec2d_t){R.right+1,R.bottom+1}); //bottom right corner, always needed
+        if (h-1==R.bottom) { // edge
+            outsides.push_back((intvec2d_t){R.left,R.bottom+1});
+            // TODO add to bottom_edges
+        }
+        else { // iterate
+            int32_t bottom_x = R.right;
+            int32_t bottom_y = R.bottom + 1; // line below rect
+            last_tag = buf32[bottom_y * w + bottom_x];
+            bottom_x--;
+            while (bottom_x >= R.left) {
+                current_tag = buf32[bottom_y * w + bottom_x];
+                if ((1==abs(current_tag)) || (current_tag!=last_tag)) { // single field or changed
+                    outsides.push_back((intvec2d_t){bottom_x+1,R.bottom+1});
+                }
+                last_tag = current_tag;
+                bottom_x--;
+            }
+        }
+
+        // left side
+        outsides.push_back((intvec2d_t){R.left,R.bottom+1}); //bottom left corner, always needed
+        if (0==R.left) { // edge
+            outsides.push_back((intvec2d_t){R.left,R.top});
+            // TODO add to left_edges
+        }
+        else { // iterate
+            int32_t left_x = R.left - 1;  // line left of rect
+            int32_t left_y = R.bottom;
+            last_tag = buf32[left_y * w + left_x];
+            left_y--;
+            while (left_y >= R.top) {
+                current_tag = buf32[left_y * w + left_x];
+                if ((1==abs(current_tag)) || (current_tag!=last_tag)) { // single field or changed
+                    outsides.push_back((intvec2d_t){R.left,left_y+1});
+                }
+                last_tag = current_tag;
+                left_y--;
+            }
+        }
+
+        intvec3d_t center, corner1, corner2;
+
+        center.x = R.left + (R.width / 2);
+        center.y = -(R.top + (R.height / 2));
+        center.z = 0; // body top surface
+
+        corner1.x = outsides[0].x;
+        corner1.y = -outsides[0].y;
+        corner1.z = 0;
+
+        corner2.x = outsides[outsides.size()-1].x;
+        corner2.y = -outsides[outsides.size()-1].y;
+        corner2.z = 0;
+
+        push_triangles(Zp, center, corner1, corner2);
+
+        for (j=1; j<outsides.size(); j++) {
+            corner1.x = outsides[j-1].x;
+            corner1.y = -outsides[j-1].y;
+            corner2.x = outsides[j].x;
+            corner2.y = -outsides[j].y;
+            push_triangles(Zp, center, corner1, corner2);
+        }
     }
 
     // glyph top surface
     for (i = 0; i < glyph_rects.size(); i++) {
-            STLrect R = glyph_rects[i];
+        STLrect R = glyph_rects[i];
 
-            utl = (intvec3d_t){R.left, -R.top, DOD};
-            utr = (intvec3d_t){(R.right + 1), -R.top, DOD};
-            ubl = (intvec3d_t){R.left, -(R.bottom + 1), DOD};
-            ubr = (intvec3d_t){(R.right + 1), -(R.bottom + 1), DOD};
 
-            push_triangles(Zp, utr, utl, ubl, ubr);
+        std::vector<intvec2d_t> outsides;
+        int32_t last_tag, current_tag;
+
+        // top side
+        outsides.push_back((intvec2d_t){R.left,R.top}); //top left corner, always needed
+        if (0==R.top) { // edge
+            outsides.push_back((intvec2d_t){R.right+1,R.top});
+            // TODO add to top_edges
+        }
+        else { // iterate
+            int32_t top_x = R.left;
+            int32_t top_y = R.top - 1; // line above rect
+            last_tag = buf32[top_y * w + top_x];
+            top_x++;
+            while (top_x <= R.right) {
+                current_tag = buf32[top_y * w + top_x];
+                if ((1==abs(current_tag)) || (current_tag!=last_tag)) { // single field or changed
+                    outsides.push_back((intvec2d_t){top_x,R.top});
+                }
+                last_tag = current_tag;
+                top_x++;
+            }
+        }
+
+        // right side
+        outsides.push_back((intvec2d_t){R.right+1,R.top}); //top right corner, always needed
+        if (w-1==R.right) { // edge
+            outsides.push_back((intvec2d_t){R.right+1,R.bottom+1});
+            // TODO add to right_edges
+        }
+        else { // iterate
+            int32_t right_x = R.right + 1;  // line right of rect
+            int32_t right_y = R.top;
+            last_tag = buf32[right_y * w + right_x];
+            right_y++;
+            while (right_y <= R.bottom) {
+                current_tag = buf32[right_y * w + right_x];
+                if ((1==abs(current_tag)) || (current_tag!=last_tag)) { // single field or changed
+                    outsides.push_back((intvec2d_t){R.right+1,right_y});
+                }
+                last_tag = current_tag;
+                right_y++;
+            }
+        }
+
+        // bottom side
+        outsides.push_back((intvec2d_t){R.right+1,R.bottom+1}); //bottom right corner, always needed
+        if (h-1==R.bottom) { // edge
+            outsides.push_back((intvec2d_t){R.left,R.bottom+1});
+            // TODO add to bottom_edges
+        }
+        else { // iterate
+            int32_t bottom_x = R.right;
+            int32_t bottom_y = R.bottom + 1; // line below rect
+            last_tag = buf32[bottom_y * w + bottom_x];
+            bottom_x--;
+            while (bottom_x >= R.left) {
+                current_tag = buf32[bottom_y * w + bottom_x];
+                if ((1==abs(current_tag)) || (current_tag!=last_tag)) { // single field or changed
+                    outsides.push_back((intvec2d_t){bottom_x+1,R.bottom+1});
+                }
+                last_tag = current_tag;
+                bottom_x--;
+            }
+        }
+
+        // left side
+        outsides.push_back((intvec2d_t){R.left,R.bottom+1}); //bottom left corner, always needed
+        if (0==R.left) { // edge
+            outsides.push_back((intvec2d_t){R.left,R.top});
+            // TODO add to left_edges
+        }
+        else { // iterate
+            int32_t left_x = R.left - 1;  // line left of rect
+            int32_t left_y = R.bottom;
+            last_tag = buf32[left_y * w + left_x];
+            left_y--;
+            while (left_y >= R.top) {
+                current_tag = buf32[left_y * w + left_x];
+                if ((1==abs(current_tag)) || (current_tag!=last_tag)) { // single field or changed
+                    outsides.push_back((intvec2d_t){R.left,left_y+1});
+                }
+                last_tag = current_tag;
+                left_y--;
+            }
+        }
+
+        intvec3d_t center, corner1, corner2;
+
+        center.x = R.left + (R.width / 2);
+        center.y = -(R.top + (R.height / 2));
+        center.z = DOD; // glyph top
+
+        corner1.x = outsides[0].x;
+        corner1.y = -outsides[0].y;
+        corner1.z = DOD;
+
+        corner2.x = outsides[outsides.size()-1].x;
+        corner2.y = -outsides[outsides.size()-1].y;
+        corner2.z = DOD;
+
+        push_triangles(Zp, center, corner1, corner2);
+
+        for (j=1; j<outsides.size(); j++) {
+            corner1.x = outsides[j-1].x;
+            corner1.y = -outsides[j-1].y;
+            corner2.x = outsides[j].x;
+            corner2.y = -outsides[j].y;
+            push_triangles(Zp, center, corner1, corner2);
+        }
+
     }
 
 

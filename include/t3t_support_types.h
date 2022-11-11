@@ -35,6 +35,10 @@ struct pos3d_t {
     float x, y, z;
 };
 
+struct intvec2d_t {
+    int32_t x, y;
+};
+
 struct intvec3d_t {
     int32_t x, y, z;
 };
