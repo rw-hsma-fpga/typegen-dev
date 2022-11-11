@@ -170,7 +170,7 @@ int generate_3D_files(TypeBitmap &TBM, std::string pbm_path, std::string stl_pat
     if (TBM.load(pbm_path)<0)
         return -1;
 
-    if (TBM.generateMesh(opts.foot, opts.nicks, opts.UVstretchXY, opts.UVstretchZ)<0)
+    if (TBM.generateMesh2(opts.foot, opts.nicks, opts.UVstretchXY, opts.UVstretchZ)<0)
         return -1;
 
     if (!stl_path.empty())

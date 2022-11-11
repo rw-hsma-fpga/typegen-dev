@@ -1150,6 +1150,445 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
 }
 
 
+
+int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float UVstretchXY, float UVstretchZ)
+{
+    int x, y;
+    int i, j, k;
+    int w = bm_width;
+    int h = bm_height;
+
+    vertices.clear();
+    intvec3d_t vec3dbuf = (intvec3d_t) {INT32_MIN, INT32_MIN, INT32_MIN};
+    vertices.push_back(vec3dbuf); // vertex #0, as OBJ files start indexing at #1
+
+    triangles.clear();
+
+
+    float RS = raster_size.as_mm();
+    float LH = layer_height.as_mm();
+
+    int32_t DOD = int32_t( round( (UVstretchZ*depth_of_drive.as_mm())/LH ) );
+    int32_t BH = int32_t( round( (UVstretchZ*(type_height.as_mm()-depth_of_drive.as_mm()))/LH ) );
+
+    int32_t FZ;
+    int32_t FXY;
+
+    if (foot.mode == no_foot) {
+        FZ = 0;
+        FXY = 0;
+    }
+    else {
+        FZ = int32_t( round( (foot.Z.as_mm() * UVstretchZ)/LH ) );
+        FXY = int32_t( round( foot.XY.as_mm()/RS  ) );
+    }
+
+
+    if (find_rectangles() <0)
+        return -1;
+
+
+    if (!loaded)
+    {
+        std::cerr << "ERROR: No Bitmap loaded." << std::endl;
+        return -1;
+    }
+
+    int32_t *buf32 = tag_bitmap_i32;
+
+    // normal vectors: X, Y, Z, positive, negative
+    intvec3d_t Xp = (intvec3d_t){ 1,  0,  0};  intvec3d_t Xn = (intvec3d_t){-1,  0,  0};
+    intvec3d_t Yp = (intvec3d_t){ 0,  1,  0};  intvec3d_t Yn = (intvec3d_t){ 0, -1,  0};
+    intvec3d_t Zp = (intvec3d_t){ 0,  0,  1};  intvec3d_t Zn = (intvec3d_t){ 0,  0, -1};
+
+
+    // cube corners: upper/lower;top/botton;left/right
+    intvec3d_t utl, utr, ubl, ubr, ltl, ltr, lbl, lbr;
+
+
+    // LARGE RECTS 
+    // body top surface
+    for (i = 0; i < body_rects.size(); i++) {
+            STLrect R = body_rects[i];
+
+            ltl = (intvec3d_t){R.left, -R.top, 0};
+            ltr = (intvec3d_t){(R.right + 1), -R.top, 0};
+            lbl = (intvec3d_t){R.left, -(R.bottom + 1), 0};
+            lbr = (intvec3d_t){(R.right + 1), -(R.bottom + 1), 0};
+
+            push_triangles(Zp, ltr, lbl, ltl, lbr);
+    }
+
+    // glyph top surface
+    for (i = 0; i < glyph_rects.size(); i++) {
+            STLrect R = glyph_rects[i];
+
+            utl = (intvec3d_t){R.left, -R.top, DOD};
+            utr = (intvec3d_t){(R.right + 1), -R.top, DOD};
+            ubl = (intvec3d_t){R.left, -(R.bottom + 1), DOD};
+            ubr = (intvec3d_t){(R.right + 1), -(R.bottom + 1), DOD};
+
+            push_triangles(Zp, utr, utl, ubl, ubr);
+    }
+
+
+
+
+    // SINGLE PIXELS
+    for (y = 0; y < bm_height; y++) {
+        for (x = 0; x < bm_width; x++) {
+
+            // pixel cube corners - assuming cubes are going up from Z=0 to Z=+(depth of drive)
+            utl = (intvec3d_t){x, -y, DOD};
+            utr = (intvec3d_t){(x + 1), -y, DOD};
+            ubl = (intvec3d_t){x, -(y + 1), DOD};
+            ubr = (intvec3d_t){(x + 1), -(y + 1), DOD};
+
+            ltl = (intvec3d_t){x, -y, 0};
+            ltr = (intvec3d_t){(x + 1), -y, 0};
+            lbl = (intvec3d_t){x, -(y + 1), 0};
+            lbr = (intvec3d_t){(x + 1), -(y + 1), 0};
+
+            // single pixel upper faces (glyph)
+            if (buf32[y * w + x] == +1) {
+                // upper face
+                push_triangles(Zp, utr, utl, ubl, ubr);
+            }
+
+            // single pixel upper faces (body / no glyph)
+            if (buf32[y * w + x] == -1) {
+                // lower faces become upper faces of body for 0
+                push_triangles(Zp, ltr, lbl, ltl, lbr);
+            }
+
+            // side walls of glyph
+            if (buf32[y * w + x] > 0) {
+                
+
+                // left face
+                if ((x == 0) || (buf32[((y)*w) + (x - 1)] < 0)) {
+                    push_triangles(Xn, ubl, utl, ltl, lbl);
+                }
+
+                // right face
+                if ((x == (bm_width - 1)) || (buf32[((y)*w) + (x + 1)] < 0)) {
+                    push_triangles(Xp, ubr, ltr, utr, lbr);
+                }
+
+                // top face
+                if ((y == 0) || (buf32[((y - 1) * w) + (x)] < 0)) {
+                    push_triangles(Yp, utl, utr, ltr, ltl);
+                }
+
+                // bottom face
+                if ((y == (bm_height - 1)) || (buf32[((y + 1) * w) + (x)] < 0)) {
+                    push_triangles(Yn, ubl, lbr, ubr, lbl);
+                }
+            }
+        }
+    }
+
+
+    int32_t BLC = 0; // body layer count
+
+    // BODY TOP STRIP - constant 1mm for now
+    int32_t TS = int32_t(round(2 * UVstretchZ) / LH);
+
+    utl = (intvec3d_t){0,  0, -BLC};
+    utr = (intvec3d_t){w,  0, -BLC};
+    ubl = (intvec3d_t){0, -h, -BLC};
+    ubr = (intvec3d_t){w, -h, -BLC};
+
+    ltl = (intvec3d_t){0,  0, -(BLC+TS)};
+    ltr = (intvec3d_t){w,  0, -(BLC+TS)};
+    lbl = (intvec3d_t){0, -h, -(BLC+TS)};
+    lbr = (intvec3d_t){w, -h, -(BLC+TS)};
+
+    push_triangles(Xn, ubl, utl, ltl, lbl); // left face
+    push_triangles(Xp, ubr, ltr, utr, lbr); // right face
+    push_triangles(Yp, utl, utr, ltr, ltl); // top face
+    push_triangles(Yn, ubl, lbr, ubr, lbl); // bottom face
+
+    BLC += TS;
+
+    // NICK LAYERS
+    for (int i; i< nicks.size(); i++) {
+        // NICK HEIGHT
+        int32_t NH = int32_t(round(nicks[i].z.as_mm() * UVstretchZ) / LH);
+
+        // TRIANGLE DEPTH - half of height
+        int32_t TD = int32_t(round((nicks[i].z.as_mm()/2) * UVstretchXY) / RS);
+
+        // RECT DEPTH
+        int32_t RD = int32_t(round(nicks[i].y.as_mm() * UVstretchXY) / RS);
+
+        if (nicks[i].type == rect) {
+            // RECT SEGMENT
+            utl = (intvec3d_t){0,  0, -BLC};
+            utr = (intvec3d_t){w,  0, -BLC};
+            ubl = (intvec3d_t){0, -(h-RD), -BLC};
+            ubr = (intvec3d_t){w, -(h-RD), -BLC};
+
+            ltl = (intvec3d_t){0,  0, -(BLC+NH)};
+            ltr = (intvec3d_t){w,  0, -(BLC+NH)};
+            lbl = (intvec3d_t){0, -(h-RD), -(BLC+NH)};
+            lbr = (intvec3d_t){w, -(h-RD), -(BLC+NH)};
+
+            push_triangles(Xn, ubl, utl, ltl, lbl); // left face
+            push_triangles(Xp, ubr, ltr, utr, lbr); // right face
+            push_triangles(Yp, utl, utr, ltr, ltl); // top face
+            push_triangles(Yn, ubl, lbr, ubr, lbl); // bottom face
+            
+            utl = (intvec3d_t){0, -(h-RD), -BLC};
+            utr = (intvec3d_t){w, -(h-RD), -BLC};
+            ubl = (intvec3d_t){0, -h, -BLC};
+            ubr = (intvec3d_t){w, -h, -BLC};
+
+            ltl = (intvec3d_t){0, -(h-RD), -(BLC+NH)};
+            ltr = (intvec3d_t){w, -(h-RD), -(BLC+NH)};
+            lbl = (intvec3d_t){0, -h, -(BLC+NH)};
+            lbr = (intvec3d_t){w, -h, -(BLC+NH)};
+
+            push_triangles(Zn, utl, utr, ubl, ubr); // downward-looking upper face of nick
+            push_triangles(Zp, ltl, ltr, lbl, lbr); // upward-looking lower face of nick
+        }
+        else if (nicks[i].type == triangle) {
+            // TRIANGLE SEGMENT
+            utl = (intvec3d_t){0,  0, -BLC};
+            utr = (intvec3d_t){w,  0, -BLC};
+            ubl = (intvec3d_t){0, -h, -BLC};
+            ubr = (intvec3d_t){w, -h, -BLC};
+
+            ltl = (intvec3d_t){0,  0, -(BLC+(NH/2))};
+            ltr = (intvec3d_t){w,  0, -(BLC+(NH/2))};
+            lbl = (intvec3d_t){0, -(h-TD), -(BLC+(NH/2))};
+            lbr = (intvec3d_t){w, -(h-TD), -(BLC+(NH/2))};
+
+            intvec3d_t YnZn = (intvec3d_t){ 0,  -1,  -1};
+            intvec3d_t YnZp = (intvec3d_t){ 0,  -1,   1};
+
+            push_triangles(Xn, ubl, utl, ltl, lbl); // left face
+            push_triangles(Xp, ubr, ltr, utr, lbr); // right face
+            push_triangles(Yp, utl, utr, ltr, ltl); // top face
+            push_triangles(YnZn, ubl, lbr, ubr, lbl); // bottom face
+            
+            utl = (intvec3d_t){0,  0, -(BLC+(NH/2))};
+            utr = (intvec3d_t){w,  0, -(BLC+(NH/2))};
+            ubl = (intvec3d_t){0, -(h-TD), -(BLC+(NH/2))};
+            ubr = (intvec3d_t){w, -(h-TD), -(BLC+(NH/2))};
+
+            ltl = (intvec3d_t){0,  0, -(BLC+NH)};
+            ltr = (intvec3d_t){w,  0, -(BLC+NH)};
+            lbl = (intvec3d_t){0, -h, -(BLC+NH)};
+            lbr = (intvec3d_t){w, -h, -(BLC+NH)};
+
+            push_triangles(Xn, ubl, utl, ltl, lbl); // left face
+            push_triangles(Xp, ubr, ltr, utr, lbr); // right face
+            push_triangles(Yp, utl, utr, ltr, ltl); // top face
+            push_triangles(YnZp, ubl, lbr, ubr, lbl); // bottom face
+        }
+        else if (nicks[i].type == circle) {
+
+            float twoPi = 8*atan(1);
+            float Pi = 4*atan(1);
+            float halfPi = 2*atan(1);
+
+            const int32_t circle_segs = 10;
+
+            for (int j=0; j< circle_segs; j++) {
+
+                // TODO make special cases for first and last to avoid rounding-error integer shift
+                float start_angle = j*(Pi/circle_segs);
+                float end_angle   = (j+1)*(Pi/circle_segs);
+
+                float start_zf = -((cos(start_angle)-1)/2) * nicks[i].z.as_mm() * UVstretchZ;  // 0.0..-1.0
+                float end_zf   = -((cos(end_angle  )-1)/2) * nicks[i].z.as_mm() * UVstretchZ;  // 0.0..-1.0
+                int32_t start_z = int32_t(round(start_zf/LH));
+                int32_t end_z   = int32_t(round(end_zf/LH));
+                if (j==0)
+                    start_z==0;
+                if (start_z > NH)
+                    start_z = NH;
+                if (end_z > NH)
+                    end_z = NH;
+
+                float start_yf = sin(start_angle) * (nicks[i].z.as_mm()/2) * UVstretchXY;
+                float end_yf   = sin(end_angle) * (nicks[i].z.as_mm()/2) * UVstretchXY;
+                int32_t start_y = int32_t(round(start_yf/RS));
+                int32_t end_y   = int32_t(round(end_yf/RS));
+
+                // MAKE N
+                intvec3d_t Nang = (intvec3d_t) { 0,  -(end_z-start_z), -(end_y-start_y)};
+
+                utl = (intvec3d_t){0,  0, -(BLC+start_z)};
+                utr = (intvec3d_t){w,  0, -(BLC+start_z)};
+                ubl = (intvec3d_t){0, -(h-start_y), -(BLC+start_z)};
+                ubr = (intvec3d_t){w, -(h-start_y), -(BLC+start_z)};
+
+                ltl = (intvec3d_t){0,  0, -(BLC+end_z)};
+                ltr = (intvec3d_t){w,  0, -(BLC+end_z)};
+                lbl = (intvec3d_t){0, -(h-end_y), -(BLC+end_z)};
+                lbr = (intvec3d_t){w, -(h-end_y), -(BLC+end_z)};
+
+                push_triangles(Xn, ubl, utl, ltl, lbl); // left face
+                push_triangles(Xp, ubr, ltr, utr, lbr); // right face
+                push_triangles(Yp, utl, utr, ltr, ltl); // top face
+                push_triangles(Nang, ubl, lbr, ubr, lbl); // bottom face
+            }
+        }
+        else {
+            // FLAT SEGMENT - TODO TODO OTHER SEGMENTS
+            utl = (intvec3d_t){0,  0, -BLC};
+            utr = (intvec3d_t){w,  0, -BLC};
+            ubl = (intvec3d_t){0, -h, -BLC};
+            ubr = (intvec3d_t){w, -h, -BLC};
+
+            ltl = (intvec3d_t){0,  0, -(BLC+NH)};
+            ltr = (intvec3d_t){w,  0, -(BLC+NH)};
+            lbl = (intvec3d_t){0, -h, -(BLC+NH)};
+            lbr = (intvec3d_t){w, -h, -(BLC+NH)};
+
+            push_triangles(Xn, ubl, utl, ltl, lbl); // left face
+            push_triangles(Xp, ubr, ltr, utr, lbr); // right face
+            push_triangles(Yp, utl, utr, ltr, ltl); // top face
+            push_triangles(Yn, ubl, lbr, ubr, lbl); // bottom face
+
+        }
+
+        BLC += NH;
+    }
+
+
+
+    // BODY BOTTOM STRIP (above reduced foot, if exists)
+    utl = (intvec3d_t){0,  0, -BLC};
+    utr = (intvec3d_t){w,  0, -BLC};
+    ubl = (intvec3d_t){0, -h, -BLC};
+    ubr = (intvec3d_t){w, -h, -BLC};
+
+    ltl = (intvec3d_t){0,  0, -(BH-FZ)};
+    ltr = (intvec3d_t){w,  0, -(BH-FZ)};
+    lbl = (intvec3d_t){0, -h, -(BH-FZ)};
+    lbr = (intvec3d_t){w, -h, -(BH-FZ)};
+
+    push_triangles(Xn, ubl, utl, ltl, lbl); // left face
+    push_triangles(Xp, ubr, ltr, utr, lbr); // right face
+    push_triangles(Yp, utl, utr, ltr, ltl); // top face
+    push_triangles(Yn, ubl, lbr, ubr, lbl); // bottom face
+
+    // REDUCED FOOT (if exists)
+
+
+    if (foot.mode == step) { // stepped foot
+        // downlooking faces around step rim
+
+        utl = (intvec3d_t){0,  0, -(BH-FZ)};
+        utr = (intvec3d_t){w,  0, -(BH-FZ)};
+        ubl = (intvec3d_t){0, -h, -(BH-FZ)};
+        ubr = (intvec3d_t){w, -h, -(BH-FZ)};
+
+
+        ltl = (intvec3d_t){FXY,     -FXY,     -(BH-FZ)};
+        ltr = (intvec3d_t){w - FXY, -FXY,     -(BH-FZ)};
+        lbl = (intvec3d_t){FXY,     -h + FXY, -(BH-FZ)};
+        lbr = (intvec3d_t){w - FXY, -h + FXY, -(BH-FZ)};
+
+        // left downward face
+        push_triangles(Zn, ubl, utl, ltl, lbl);
+
+        // right downward face
+        push_triangles(Zn, ubr, ltr, utr, lbr);
+
+        // top downward face
+        push_triangles(Zn, utl, utr, ltr, ltl);
+
+        // bottom downward face
+        push_triangles(Zn, ubl, lbr, ubr, lbl);
+    }
+
+
+    if (foot.mode == step) { // stepped foot
+        utl = (intvec3d_t){FXY,         -FXY, -(BH-FZ)};
+        utr = (intvec3d_t){w - FXY,     -FXY, -(BH-FZ)};
+        ubl = (intvec3d_t){FXY,     -h + FXY, -(BH-FZ)};
+        ubr = (intvec3d_t){w - FXY, -h + FXY, -(BH-FZ)};
+
+        ltl = (intvec3d_t){FXY,         -FXY, -BH};
+        ltr = (intvec3d_t){w - FXY,     -FXY, -BH};
+        lbl = (intvec3d_t){FXY,     -h + FXY, -BH};
+        lbr = (intvec3d_t){w - FXY, -h + FXY, -BH};
+
+        // left face
+        push_triangles(Xn, ubl, utl, ltl, lbl);
+
+        // right face
+        push_triangles(Xp, ubr, ltr, utr, lbr);
+
+        // top face
+        push_triangles(Yp, utl, utr, ltr, ltl);
+
+        // bottom face
+        push_triangles(Yn, ubl, lbr, ubr, lbl);
+
+    }
+
+    if (foot.mode == bevel) { // beveled foot
+        utl = (intvec3d_t){0,  0, -(BH-FZ)};
+        utr = (intvec3d_t){w,  0, -(BH-FZ)};
+        ubl = (intvec3d_t){0, -h, -(BH-FZ)};
+        ubr = (intvec3d_t){w, -h, -(BH-FZ)};
+
+        ltl = (intvec3d_t){FXY,         -FXY, -BH};
+        ltr = (intvec3d_t){w - FXY,     -FXY, -BH};
+        lbl = (intvec3d_t){FXY,     -h + FXY, -BH};
+        lbr = (intvec3d_t){w - FXY, -h + FXY, -BH};
+
+        intvec3d_t N;
+        N.z = -FXY;
+
+        // left face
+        N.x = -FZ; N.y = 0 ;
+        push_triangles(N, ubl, utl, ltl, lbl);
+
+        // right face
+        N.x = FZ; N.y = 0 ;
+        push_triangles(N, ubr, ltr, utr, lbr);
+
+        // top face
+        N.y = FZ; N.x = 0 ;
+        push_triangles(N, utl, utr, ltr, ltl);
+
+        // bottom face
+        N.y = -FZ; N.y = 0 ;
+        push_triangles(N, ubl, lbr, ubr, lbl);
+    }
+
+
+    // LOWER SURFACE
+
+    // bevel/step foot
+    if ((foot.mode == step) || (foot.mode == bevel)) {
+        ltl = (intvec3d_t){FXY,         -FXY, -BH};
+        ltr = (intvec3d_t){w - FXY,     -FXY, -BH};
+        lbl = (intvec3d_t){FXY,     -h + FXY, -BH};
+        lbr = (intvec3d_t){w - FXY, -h + FXY, -BH};
+    }
+    else { // no reduced foot
+        ltl = (intvec3d_t){0,  0, -BH};
+        ltr = (intvec3d_t){w,  0, -BH};
+        lbl = (intvec3d_t){0, -h, -BH};
+        lbr = (intvec3d_t){w, -h, -BH};
+    }
+
+    // lower face - prepared XY coordinates differ between foot.mode "no_foot" and "bevel/step"
+    push_triangles(Zn, ltr, lbl, ltl, lbr);    
+
+    return 0;
+}
+
+
+
+
 int TypeBitmap::writeOBJ(std::string filename)
 {
     int i;
