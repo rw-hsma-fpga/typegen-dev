@@ -1217,6 +1217,7 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
 
         std::vector<intvec2d_t> outsides;
         int32_t last_tag, current_tag;
+        bool Rneg = (R.tag < 0);
 
         // top side
         outsides.push_back((intvec2d_t){R.left,R.top}); //top left corner, always needed
@@ -1231,7 +1232,7 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
             top_x++;
             while (top_x <= R.right) {
                 current_tag = buf32[top_y * w + top_x];
-                if ((1==abs(current_tag)) || (current_tag!=last_tag)) { // single field or changed
+                if ((1==abs(current_tag)) || (current_tag!=last_tag) || (Rneg != (current_tag < 0))) { // single field, vertical wall or changed
                     outsides.push_back((intvec2d_t){top_x,R.top});
                 }
                 last_tag = current_tag;
@@ -1252,7 +1253,7 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
             right_y++;
             while (right_y <= R.bottom) {
                 current_tag = buf32[right_y * w + right_x];
-                if ((1==abs(current_tag)) || (current_tag!=last_tag)) { // single field or changed
+                if ((1==abs(current_tag)) || (current_tag!=last_tag) || (Rneg != (current_tag < 0))) { // single field, vertical wall or changed
                     outsides.push_back((intvec2d_t){R.right+1,right_y});
                 }
                 last_tag = current_tag;
@@ -1273,7 +1274,7 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
             bottom_x--;
             while (bottom_x >= R.left) {
                 current_tag = buf32[bottom_y * w + bottom_x];
-                if ((1==abs(current_tag)) || (current_tag!=last_tag)) { // single field or changed
+                if ((1==abs(current_tag)) || (current_tag!=last_tag) || (Rneg != (current_tag < 0))) { // single field, vertical wall or changed
                     outsides.push_back((intvec2d_t){bottom_x+1,R.bottom+1});
                 }
                 last_tag = current_tag;
@@ -1294,7 +1295,7 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
             left_y--;
             while (left_y >= R.top) {
                 current_tag = buf32[left_y * w + left_x];
-                if ((1==abs(current_tag)) || (current_tag!=last_tag)) { // single field or changed
+                if ((1==abs(current_tag)) || (current_tag!=last_tag) || (Rneg != (current_tag < 0))) { // single field, vertical wall or changed
                     outsides.push_back((intvec2d_t){R.left,left_y+1});
                 }
                 last_tag = current_tag;
@@ -1331,9 +1332,9 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
     for (i = 0; i < glyph_rects.size(); i++) {
         STLrect R = glyph_rects[i];
 
-
         std::vector<intvec2d_t> outsides;
         int32_t last_tag, current_tag;
+        bool Rneg = (R.tag < 0);
 
         // top side
         outsides.push_back((intvec2d_t){R.left,R.top}); //top left corner, always needed
@@ -1348,7 +1349,7 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
             top_x++;
             while (top_x <= R.right) {
                 current_tag = buf32[top_y * w + top_x];
-                if ((1==abs(current_tag)) || (current_tag!=last_tag)) { // single field or changed
+                if ((1==abs(current_tag)) || (current_tag!=last_tag) || (Rneg != (current_tag < 0))) { // single field, vertical wall or changed
                     outsides.push_back((intvec2d_t){top_x,R.top});
                 }
                 last_tag = current_tag;
@@ -1369,7 +1370,7 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
             right_y++;
             while (right_y <= R.bottom) {
                 current_tag = buf32[right_y * w + right_x];
-                if ((1==abs(current_tag)) || (current_tag!=last_tag)) { // single field or changed
+                if ((1==abs(current_tag)) || (current_tag!=last_tag) || (Rneg != (current_tag < 0))) { // single field, vertical wall or changed
                     outsides.push_back((intvec2d_t){R.right+1,right_y});
                 }
                 last_tag = current_tag;
@@ -1390,7 +1391,7 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
             bottom_x--;
             while (bottom_x >= R.left) {
                 current_tag = buf32[bottom_y * w + bottom_x];
-                if ((1==abs(current_tag)) || (current_tag!=last_tag)) { // single field or changed
+                if ((1==abs(current_tag)) || (current_tag!=last_tag) || (Rneg != (current_tag < 0))) { // single field, vertical wall or changed
                     outsides.push_back((intvec2d_t){bottom_x+1,R.bottom+1});
                 }
                 last_tag = current_tag;
@@ -1411,7 +1412,7 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
             left_y--;
             while (left_y >= R.top) {
                 current_tag = buf32[left_y * w + left_x];
-                if ((1==abs(current_tag)) || (current_tag!=last_tag)) { // single field or changed
+                if ((1==abs(current_tag)) || (current_tag!=last_tag) || (Rneg != (current_tag < 0))) { // single field, vertical wall or changed
                     outsides.push_back((intvec2d_t){R.left,left_y+1});
                 }
                 last_tag = current_tag;
