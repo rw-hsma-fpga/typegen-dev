@@ -34,7 +34,8 @@ class TypeBitmap {
     int32_t *tag_bitmap_i32;
 
     struct STLrect {
-        int32_t top, left, bottom, right;
+        int32_t top, left, bottom, right; // u32?
+        int32_t width, height; // u32?
         int32_t tag;
     };
     std::vector<STLrect> glyph_rects;
@@ -53,10 +54,11 @@ class TypeBitmap {
     dim_t raster_size;
     dim_t layer_height; // not really required here
 
-    void OBJ_rect_push(intvec3d_t N,
-                       intvec3d_t v1, intvec3d_t v2,
-                       intvec3d_t v3, intvec3d_t v4);
+    void push_triangles(intvec3d_t N,
+                       intvec3d_t v1, intvec3d_t v2, intvec3d_t v3,
+                       intvec3d_t v4 = {0, 0, INT32_MAX});
 
+    void fill_rectangle(int32_t *bm32, STLrect rect); // not needed
     int find_rectangles(void);
 
     uint32_t find_or_add_vertex(intvec3d_t v);

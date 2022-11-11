@@ -343,10 +343,16 @@ int TypeBitmap::set_type_parameters(dim_t TH, dim_t DOD, dim_t RS, dim_t LH)
 }
 
 
-void TypeBitmap::OBJ_rect_push(intvec3d_t N, intvec3d_t v1, intvec3d_t v2, intvec3d_t v3, intvec3d_t v4)
+void TypeBitmap::push_triangles(intvec3d_t N, intvec3d_t v1, intvec3d_t v2, intvec3d_t v3, intvec3d_t v4)
 {
+    int n = 4; // quadrilateral (==2 triangles) by default
+    if (INT32_MAX == v4.z) // only 3 points specified
+        n=3;
+
     float twoPi = 8*atan(1);
     float halfPi = 2*atan(1);
+
+    float center_x, center_y;
 
     struct prj2d_t {
         intvec3d_t *vert3d;
@@ -426,7 +432,7 @@ void TypeBitmap::OBJ_rect_push(intvec3d_t N, intvec3d_t v1, intvec3d_t v2, intve
         std::cout << "P1 after Y-X rot:  x=" << P1.x << ", y=" << P1.y << ", z=" << P1.z << std::endl;
     */
 
-    for (int i=0; i<4; i++) {
+    for (int i=0; i<n; i++) {
         float x = float(proj[i].vert3d->x);
         float y = float(proj[i].vert3d->y);
         float z = float(proj[i].vert3d->z);
@@ -434,10 +440,16 @@ void TypeBitmap::OBJ_rect_push(intvec3d_t N, intvec3d_t v1, intvec3d_t v2, intve
         proj[i].py = y*cosrX - (-x*sinrY + z*cosrY)*sinrX;
     }
 
-    float center_x = (proj[0].px + proj[1].px + proj[2].px + proj[3].px) / 4;
-    float center_y = (proj[0].py + proj[1].py + proj[2].py + proj[3].py) / 4;
+    if (4==n) { // quadrilateral
+        center_x = (proj[0].px + proj[1].px + proj[2].px + proj[3].px) / 4;
+        center_y = (proj[0].py + proj[1].py + proj[2].py + proj[3].py) / 4;
+    }
+    else { // single triangle
+        center_x = (proj[0].px + proj[1].px + proj[2].px) / 3;
+        center_y = (proj[0].py + proj[1].py + proj[2].py) / 3;
+    }
 
-    for (int i=0; i<4; i++) {
+    for (int i=0; i<n; i++) {
         float deltax = proj[i].px - center_x;
         float deltay = proj[i].py - center_y;
         float norm = sqrt(deltax*deltax + deltay*deltay);
@@ -454,24 +466,17 @@ void TypeBitmap::OBJ_rect_push(intvec3d_t N, intvec3d_t v1, intvec3d_t v2, intve
         
     }
 
-    // bubble sort 1..3 
-    uint8_t swap_pos;
-    float swap_angle;
-    intvec3d_t *swap_vert3d;
+    // bubble sort
+    prj2d_t swap;
 
-    for (int i=0; i<3; i++) {
-        int j = (i % 2)+1; // 1-2,2-3,1-2,done
-        if (proj[j].angle > proj[j+1].angle) {
-            swap_pos    = proj[j].pos;
-            swap_angle  = proj[j].angle;
-            swap_vert3d = proj[j].vert3d;
-            proj[j].pos    = proj[j+1].pos;
-            proj[j].angle  = proj[j+1].angle;
-            proj[j].vert3d = proj[j+1].vert3d;
-            proj[j+1].pos    = swap_pos;
-            proj[j+1].angle  = swap_angle;
-            proj[j+1].vert3d = swap_vert3d;
-        }
+    for (int i=0; i<(n-1); i++) {
+       for (int j=0; j<(n-i-1); j++) {
+            if (proj[j].angle > proj[j+1].angle) {
+                swap = proj[j]; // TODO optimize: don't swap px, py
+                proj[j] = proj[j+1];
+                proj[j+1] = swap;
+            }
+       }
     }
 
     mesh_triangle TRI;
@@ -482,11 +487,13 @@ void TypeBitmap::OBJ_rect_push(intvec3d_t N, intvec3d_t v1, intvec3d_t v2, intve
     TRI.v3 = find_or_add_vertex(*(proj[2].vert3d));
     triangles.push_back(TRI);
 
-    TRI.N = N;
-    TRI.v1 = find_or_add_vertex(*(proj[0].vert3d));
-    TRI.v2 = find_or_add_vertex(*(proj[2].vert3d));
-    TRI.v3 = find_or_add_vertex(*(proj[3].vert3d));
-    triangles.push_back(TRI);
+    if (4==n) { // quadrilateral, so there is a 2nd triangle
+        TRI.N = N;
+        TRI.v1 = find_or_add_vertex(*(proj[0].vert3d));
+        TRI.v2 = find_or_add_vertex(*(proj[2].vert3d));
+        TRI.v3 = find_or_add_vertex(*(proj[3].vert3d));
+        triangles.push_back(TRI);
+    }
 }
 
 
@@ -504,6 +511,24 @@ uint32_t TypeBitmap::find_or_add_vertex(intvec3d_t v)
     // didn't find it, so make new one:
     vertices.push_back(v);
     return i; // new vertex' index
+}
+
+
+void TypeBitmap::fill_rectangle(int32_t *bm32, STLrect rect)
+{
+    int32_t value = rect.tag;
+    int32_t xmax = rect.width;
+    int32_t ymax = rect.height;
+
+    bm32 += (rect.top*bm_width + rect.left); // start position
+
+    for (int y=0; y<ymax; y++) {
+        for (int x=0; x<xmax; x++) {
+            *bm32++ = value;
+        }
+        bm32 -= rect.width; // line start
+        bm32 += bm_width; // next line
+    }
 }
 
 
@@ -660,12 +685,8 @@ int TypeBitmap::find_rectangles(void)
         }
 
         if (expanded) {
-            if (val==-1) {
-                body_rects.push_back(valrect);
-            }
-            if (val==+1) {
-                glyph_rects.push_back(valrect);
-            }
+            valrect.width = valrect.right - valrect.left + 1;
+            valrect.height = valrect.bottom - valrect.top + 1;
 
             buf32 = tag_bitmap_i32;
             buf32 += (valrect.top*w);
@@ -676,6 +697,13 @@ int TypeBitmap::find_rectangles(void)
                 buf32 += w;
             }
             buf32 = tag_bitmap_i32;
+
+            if (val==-1) {
+                body_rects.push_back(valrect);
+            }
+            if (val==+1) {
+                glyph_rects.push_back(valrect);
+            }
 
 
             tag_cnt++;
@@ -751,7 +779,7 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
             lbl = (intvec3d_t){R.left, -(R.bottom + 1), 0};
             lbr = (intvec3d_t){(R.right + 1), -(R.bottom + 1), 0};
 
-            OBJ_rect_push(Zp, ltr, lbl, ltl, lbr);
+            push_triangles(Zp, ltr, lbl, ltl, lbr);
     }
 
     // glyph top surface
@@ -763,7 +791,7 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
             ubl = (intvec3d_t){R.left, -(R.bottom + 1), DOD};
             ubr = (intvec3d_t){(R.right + 1), -(R.bottom + 1), DOD};
 
-            OBJ_rect_push(Zp, utr, utl, ubl, ubr);
+            push_triangles(Zp, utr, utl, ubl, ubr);
     }
 
 
@@ -787,13 +815,13 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
             // single pixel upper faces (glyph)
             if (buf32[y * w + x] == +1) {
                 // upper face
-                OBJ_rect_push(Zp, utr, utl, ubl, ubr);
+                push_triangles(Zp, utr, utl, ubl, ubr);
             }
 
             // single pixel upper faces (body / no glyph)
             if (buf32[y * w + x] == -1) {
                 // lower faces become upper faces of body for 0
-                OBJ_rect_push(Zp, ltr, lbl, ltl, lbr);
+                push_triangles(Zp, ltr, lbl, ltl, lbr);
             }
 
             // side walls of glyph
@@ -802,22 +830,22 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
 
                 // left face
                 if ((x == 0) || (buf32[((y)*w) + (x - 1)] < 0)) {
-                    OBJ_rect_push(Xn, ubl, utl, ltl, lbl);
+                    push_triangles(Xn, ubl, utl, ltl, lbl);
                 }
 
                 // right face
                 if ((x == (bm_width - 1)) || (buf32[((y)*w) + (x + 1)] < 0)) {
-                    OBJ_rect_push(Xp, ubr, ltr, utr, lbr);
+                    push_triangles(Xp, ubr, ltr, utr, lbr);
                 }
 
                 // top face
                 if ((y == 0) || (buf32[((y - 1) * w) + (x)] < 0)) {
-                    OBJ_rect_push(Yp, utl, utr, ltr, ltl);
+                    push_triangles(Yp, utl, utr, ltr, ltl);
                 }
 
                 // bottom face
                 if ((y == (bm_height - 1)) || (buf32[((y + 1) * w) + (x)] < 0)) {
-                    OBJ_rect_push(Yn, ubl, lbr, ubr, lbl);
+                    push_triangles(Yn, ubl, lbr, ubr, lbl);
                 }
             }
         }
@@ -839,10 +867,10 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
     lbl = (intvec3d_t){0, -h, -(BLC+TS)};
     lbr = (intvec3d_t){w, -h, -(BLC+TS)};
 
-    OBJ_rect_push(Xn, ubl, utl, ltl, lbl); // left face
-    OBJ_rect_push(Xp, ubr, ltr, utr, lbr); // right face
-    OBJ_rect_push(Yp, utl, utr, ltr, ltl); // top face
-    OBJ_rect_push(Yn, ubl, lbr, ubr, lbl); // bottom face
+    push_triangles(Xn, ubl, utl, ltl, lbl); // left face
+    push_triangles(Xp, ubr, ltr, utr, lbr); // right face
+    push_triangles(Yp, utl, utr, ltr, ltl); // top face
+    push_triangles(Yn, ubl, lbr, ubr, lbl); // bottom face
 
     BLC += TS;
 
@@ -869,10 +897,10 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
             lbl = (intvec3d_t){0, -(h-RD), -(BLC+NH)};
             lbr = (intvec3d_t){w, -(h-RD), -(BLC+NH)};
 
-            OBJ_rect_push(Xn, ubl, utl, ltl, lbl); // left face
-            OBJ_rect_push(Xp, ubr, ltr, utr, lbr); // right face
-            OBJ_rect_push(Yp, utl, utr, ltr, ltl); // top face
-            OBJ_rect_push(Yn, ubl, lbr, ubr, lbl); // bottom face
+            push_triangles(Xn, ubl, utl, ltl, lbl); // left face
+            push_triangles(Xp, ubr, ltr, utr, lbr); // right face
+            push_triangles(Yp, utl, utr, ltr, ltl); // top face
+            push_triangles(Yn, ubl, lbr, ubr, lbl); // bottom face
             
             utl = (intvec3d_t){0, -(h-RD), -BLC};
             utr = (intvec3d_t){w, -(h-RD), -BLC};
@@ -884,8 +912,8 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
             lbl = (intvec3d_t){0, -h, -(BLC+NH)};
             lbr = (intvec3d_t){w, -h, -(BLC+NH)};
 
-            OBJ_rect_push(Zn, utl, utr, ubl, ubr); // downward-looking upper face of nick
-            OBJ_rect_push(Zp, ltl, ltr, lbl, lbr); // upward-looking lower face of nick
+            push_triangles(Zn, utl, utr, ubl, ubr); // downward-looking upper face of nick
+            push_triangles(Zp, ltl, ltr, lbl, lbr); // upward-looking lower face of nick
         }
         else if (nicks[i].type == triangle) {
             // TRIANGLE SEGMENT
@@ -902,10 +930,10 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
             intvec3d_t YnZn = (intvec3d_t){ 0,  -1,  -1};
             intvec3d_t YnZp = (intvec3d_t){ 0,  -1,   1};
 
-            OBJ_rect_push(Xn, ubl, utl, ltl, lbl); // left face
-            OBJ_rect_push(Xp, ubr, ltr, utr, lbr); // right face
-            OBJ_rect_push(Yp, utl, utr, ltr, ltl); // top face
-            OBJ_rect_push(YnZn, ubl, lbr, ubr, lbl); // bottom face
+            push_triangles(Xn, ubl, utl, ltl, lbl); // left face
+            push_triangles(Xp, ubr, ltr, utr, lbr); // right face
+            push_triangles(Yp, utl, utr, ltr, ltl); // top face
+            push_triangles(YnZn, ubl, lbr, ubr, lbl); // bottom face
             
             utl = (intvec3d_t){0,  0, -(BLC+(NH/2))};
             utr = (intvec3d_t){w,  0, -(BLC+(NH/2))};
@@ -917,10 +945,10 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
             lbl = (intvec3d_t){0, -h, -(BLC+NH)};
             lbr = (intvec3d_t){w, -h, -(BLC+NH)};
 
-            OBJ_rect_push(Xn, ubl, utl, ltl, lbl); // left face
-            OBJ_rect_push(Xp, ubr, ltr, utr, lbr); // right face
-            OBJ_rect_push(Yp, utl, utr, ltr, ltl); // top face
-            OBJ_rect_push(YnZp, ubl, lbr, ubr, lbl); // bottom face
+            push_triangles(Xn, ubl, utl, ltl, lbl); // left face
+            push_triangles(Xp, ubr, ltr, utr, lbr); // right face
+            push_triangles(Yp, utl, utr, ltr, ltl); // top face
+            push_triangles(YnZp, ubl, lbr, ubr, lbl); // bottom face
         }
         else if (nicks[i].type == circle) {
 
@@ -965,10 +993,10 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
                 lbl = (intvec3d_t){0, -(h-end_y), -(BLC+end_z)};
                 lbr = (intvec3d_t){w, -(h-end_y), -(BLC+end_z)};
 
-                OBJ_rect_push(Xn, ubl, utl, ltl, lbl); // left face
-                OBJ_rect_push(Xp, ubr, ltr, utr, lbr); // right face
-                OBJ_rect_push(Yp, utl, utr, ltr, ltl); // top face
-                OBJ_rect_push(Nang, ubl, lbr, ubr, lbl); // bottom face
+                push_triangles(Xn, ubl, utl, ltl, lbl); // left face
+                push_triangles(Xp, ubr, ltr, utr, lbr); // right face
+                push_triangles(Yp, utl, utr, ltr, ltl); // top face
+                push_triangles(Nang, ubl, lbr, ubr, lbl); // bottom face
             }
         }
         else {
@@ -983,10 +1011,10 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
             lbl = (intvec3d_t){0, -h, -(BLC+NH)};
             lbr = (intvec3d_t){w, -h, -(BLC+NH)};
 
-            OBJ_rect_push(Xn, ubl, utl, ltl, lbl); // left face
-            OBJ_rect_push(Xp, ubr, ltr, utr, lbr); // right face
-            OBJ_rect_push(Yp, utl, utr, ltr, ltl); // top face
-            OBJ_rect_push(Yn, ubl, lbr, ubr, lbl); // bottom face
+            push_triangles(Xn, ubl, utl, ltl, lbl); // left face
+            push_triangles(Xp, ubr, ltr, utr, lbr); // right face
+            push_triangles(Yp, utl, utr, ltr, ltl); // top face
+            push_triangles(Yn, ubl, lbr, ubr, lbl); // bottom face
 
         }
 
@@ -1006,10 +1034,10 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
     lbl = (intvec3d_t){0, -h, -(BH-FZ)};
     lbr = (intvec3d_t){w, -h, -(BH-FZ)};
 
-    OBJ_rect_push(Xn, ubl, utl, ltl, lbl); // left face
-    OBJ_rect_push(Xp, ubr, ltr, utr, lbr); // right face
-    OBJ_rect_push(Yp, utl, utr, ltr, ltl); // top face
-    OBJ_rect_push(Yn, ubl, lbr, ubr, lbl); // bottom face
+    push_triangles(Xn, ubl, utl, ltl, lbl); // left face
+    push_triangles(Xp, ubr, ltr, utr, lbr); // right face
+    push_triangles(Yp, utl, utr, ltr, ltl); // top face
+    push_triangles(Yn, ubl, lbr, ubr, lbl); // bottom face
 
     // REDUCED FOOT (if exists)
 
@@ -1029,16 +1057,16 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         lbr = (intvec3d_t){w - FXY, -h + FXY, -(BH-FZ)};
 
         // left downward face
-        OBJ_rect_push(Zn, ubl, utl, ltl, lbl);
+        push_triangles(Zn, ubl, utl, ltl, lbl);
 
         // right downward face
-        OBJ_rect_push(Zn, ubr, ltr, utr, lbr);
+        push_triangles(Zn, ubr, ltr, utr, lbr);
 
         // top downward face
-        OBJ_rect_push(Zn, utl, utr, ltr, ltl);
+        push_triangles(Zn, utl, utr, ltr, ltl);
 
         // bottom downward face
-        OBJ_rect_push(Zn, ubl, lbr, ubr, lbl);
+        push_triangles(Zn, ubl, lbr, ubr, lbl);
     }
 
 
@@ -1054,16 +1082,16 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         lbr = (intvec3d_t){w - FXY, -h + FXY, -BH};
 
         // left face
-        OBJ_rect_push(Xn, ubl, utl, ltl, lbl);
+        push_triangles(Xn, ubl, utl, ltl, lbl);
 
         // right face
-        OBJ_rect_push(Xp, ubr, ltr, utr, lbr);
+        push_triangles(Xp, ubr, ltr, utr, lbr);
 
         // top face
-        OBJ_rect_push(Yp, utl, utr, ltr, ltl);
+        push_triangles(Yp, utl, utr, ltr, ltl);
 
         // bottom face
-        OBJ_rect_push(Yn, ubl, lbr, ubr, lbl);
+        push_triangles(Yn, ubl, lbr, ubr, lbl);
 
     }
 
@@ -1083,19 +1111,19 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
 
         // left face
         N.x = -FZ; N.y = 0 ;
-        OBJ_rect_push(N, ubl, utl, ltl, lbl);
+        push_triangles(N, ubl, utl, ltl, lbl);
 
         // right face
         N.x = FZ; N.y = 0 ;
-        OBJ_rect_push(N, ubr, ltr, utr, lbr);
+        push_triangles(N, ubr, ltr, utr, lbr);
 
         // top face
         N.y = FZ; N.x = 0 ;
-        OBJ_rect_push(N, utl, utr, ltr, ltl);
+        push_triangles(N, utl, utr, ltr, ltl);
 
         // bottom face
         N.y = -FZ; N.y = 0 ;
-        OBJ_rect_push(N, ubl, lbr, ubr, lbl);
+        push_triangles(N, ubl, lbr, ubr, lbl);
     }
 
 
@@ -1116,7 +1144,7 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
     }
 
     // lower face - prepared XY coordinates differ between foot.mode "no_foot" and "bevel/step"
-    OBJ_rect_push(Zn, ltr, lbl, ltl, lbr);    
+    push_triangles(Zn, ltr, lbl, ltl, lbr);    
 
     return 0;
 }
