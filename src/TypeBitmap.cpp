@@ -858,24 +858,24 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
     int32_t BLC = 0; // body layer count
 
     // BODY TOP STRIP - constant 1mm for now
-    int32_t TS = int32_t(round(2 * UVstretchZ) / LH);
+    int32_t US = int32_t(round(2 * UVstretchZ) / LH);
 
     utl = (intvec3d_t){0,  0, -BLC};
     utr = (intvec3d_t){w,  0, -BLC};
     ubl = (intvec3d_t){0, -h, -BLC};
     ubr = (intvec3d_t){w, -h, -BLC};
 
-    ltl = (intvec3d_t){0,  0, -(BLC+TS)};
-    ltr = (intvec3d_t){w,  0, -(BLC+TS)};
-    lbl = (intvec3d_t){0, -h, -(BLC+TS)};
-    lbr = (intvec3d_t){w, -h, -(BLC+TS)};
+    ltl = (intvec3d_t){0,  0, -(BLC+US)};
+    ltr = (intvec3d_t){w,  0, -(BLC+US)};
+    lbl = (intvec3d_t){0, -h, -(BLC+US)};
+    lbr = (intvec3d_t){w, -h, -(BLC+US)};
 
     push_triangles(Xn, ubl, utl, ltl, lbl); // left face
     push_triangles(Xp, ubr, ltr, utr, lbr); // right face
     push_triangles(Yp, utl, utr, ltr, ltl); // top face
     push_triangles(Yn, ubl, lbr, ubr, lbl); // bottom face
 
-    BLC += TS;
+    BLC += US;
 
     // NICK LAYERS
     for (int i; i< nicks.size(); i++) {
@@ -1208,7 +1208,6 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
     // cube corners: upper/lower;top/botton;left/right
     intvec3d_t utl, utr, ubl, ubr, ltl, ltr, lbl, lbr;
 
-    std::vector<intvec2d_t> top_edges, right_edges, bottom_edges, left_edges; // need for connection with top ribbon - TODO
 
     // LARGE RECTS (min 2x2)
     // body top surface
@@ -1223,7 +1222,6 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
         outsides.push_back((intvec2d_t){R.left,R.top}); //top left corner, always needed
         if (0==R.top) { // edge
             outsides.push_back((intvec2d_t){R.right+1,R.top});
-            // TODO add to top_edges
         }
         else { // iterate
             int32_t top_x = R.left;
@@ -1244,7 +1242,6 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
         outsides.push_back((intvec2d_t){R.right+1,R.top}); //top right corner, always needed
         if (w-1==R.right) { // edge
             outsides.push_back((intvec2d_t){R.right+1,R.bottom+1});
-            // TODO add to right_edges
         }
         else { // iterate
             int32_t right_x = R.right + 1;  // line right of rect
@@ -1265,7 +1262,6 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
         outsides.push_back((intvec2d_t){R.right+1,R.bottom+1}); //bottom right corner, always needed
         if (h-1==R.bottom) { // edge
             outsides.push_back((intvec2d_t){R.left,R.bottom+1});
-            // TODO add to bottom_edges
         }
         else { // iterate
             int32_t bottom_x = R.right;
@@ -1286,7 +1282,6 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
         outsides.push_back((intvec2d_t){R.left,R.bottom+1}); //bottom left corner, always needed
         if (0==R.left) { // edge
             outsides.push_back((intvec2d_t){R.left,R.top});
-            // TODO add to left_edges
         }
         else { // iterate
             int32_t left_x = R.left - 1;  // line left of rect
@@ -1340,7 +1335,6 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
         outsides.push_back((intvec2d_t){R.left,R.top}); //top left corner, always needed
         if (0==R.top) { // edge
             outsides.push_back((intvec2d_t){R.right+1,R.top});
-            // TODO add to top_edges
         }
         else { // iterate
             int32_t top_x = R.left;
@@ -1361,7 +1355,6 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
         outsides.push_back((intvec2d_t){R.right+1,R.top}); //top right corner, always needed
         if (w-1==R.right) { // edge
             outsides.push_back((intvec2d_t){R.right+1,R.bottom+1});
-            // TODO add to right_edges
         }
         else { // iterate
             int32_t right_x = R.right + 1;  // line right of rect
@@ -1382,7 +1375,6 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
         outsides.push_back((intvec2d_t){R.right+1,R.bottom+1}); //bottom right corner, always needed
         if (h-1==R.bottom) { // edge
             outsides.push_back((intvec2d_t){R.left,R.bottom+1});
-            // TODO add to bottom_edges
         }
         else { // iterate
             int32_t bottom_x = R.right;
@@ -1403,7 +1395,6 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
         outsides.push_back((intvec2d_t){R.left,R.bottom+1}); //bottom left corner, always needed
         if (0==R.left) { // edge
             outsides.push_back((intvec2d_t){R.left,R.top});
-            // TODO add to left_edges
         }
         else { // iterate
             int32_t left_x = R.left - 1;  // line left of rect
@@ -1506,25 +1497,123 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
 
     int32_t BLC = 0; // body layer count
 
-    // BODY TOP STRIP - constant 1mm for now
-    int32_t TS = int32_t(round(2 * UVstretchZ) / LH);
+    // BODY UPPER STRIP - constant 2mm for now
+    int32_t US = int32_t(round(2 * UVstretchZ) / LH);
 
-    utl = (intvec3d_t){0,  0, -BLC};
-    utr = (intvec3d_t){w,  0, -BLC};
-    ubl = (intvec3d_t){0, -h, -BLC};
-    ubr = (intvec3d_t){w, -h, -BLC};
+    utl = (intvec3d_t){0,  0, 0};
+    utr = (intvec3d_t){w,  0, 0};
+    ubl = (intvec3d_t){0, -h, 0};
+    ubr = (intvec3d_t){w, -h, 0};
 
-    ltl = (intvec3d_t){0,  0, -(BLC+TS)};
-    ltr = (intvec3d_t){w,  0, -(BLC+TS)};
-    lbl = (intvec3d_t){0, -h, -(BLC+TS)};
-    lbr = (intvec3d_t){w, -h, -(BLC+TS)};
+    ltl = (intvec3d_t){0,  0, -US};
+    ltr = (intvec3d_t){w,  0, -US};
+    lbl = (intvec3d_t){0, -h, -US};
+    lbr = (intvec3d_t){w, -h, -US};
 
-    push_triangles(Xn, ubl, utl, ltl, lbl); // left face
-    push_triangles(Xp, ubr, ltr, utr, lbr); // right face
-    push_triangles(Yp, utl, utr, ltr, ltl); // top face
-    push_triangles(Yn, ubl, lbr, ubr, lbl); // bottom face
+    intvec3d_t top_center    = (intvec3d_t){w/2,   0, -(US/2)};
+    intvec3d_t bottom_center = (intvec3d_t){w/2,  -h, -(US/2)};
+    intvec3d_t left_center   = (intvec3d_t){0,  -h/2, -(US/2)};
+    intvec3d_t right_center  = (intvec3d_t){w,  -h/2, -(US/2)};
 
-    BLC += TS;
+    std::vector<intvec3d_t> top_edge, right_edge, bottom_edge, left_edge; // upper surface points to be connected
+    int32_t last_tag, current_tag;
+
+    // upper strip - top edge
+    top_edge.push_back(utr);
+    top_edge.push_back(ltr);
+    top_edge.push_back(ltl);
+    top_edge.push_back(utl);
+    buf32 = tag_bitmap_i32;
+    last_tag = *buf32; // upper left pixel
+    buf32++;
+    for (int x=1; x<bm_width; x++) {
+        current_tag = *buf32;
+        if ((current_tag>0) || (current_tag!=last_tag)) {
+            top_edge.push_back((intvec3d_t){x, 0, 0});
+        }
+        last_tag = current_tag;
+        buf32++;
+    }
+
+    push_triangles(Yp, top_center, top_edge[0], top_edge[top_edge.size()-1]);
+
+    for (j=1; j<top_edge.size(); j++) {
+        push_triangles(Yp, top_center, top_edge[j-1], top_edge[j]);
+    }
+
+    // upper strip - right edge
+    right_edge.push_back(ubr);
+    right_edge.push_back(lbr);
+    right_edge.push_back(ltr);
+    right_edge.push_back(utr);
+    buf32 = tag_bitmap_i32;
+    buf32 += (bm_width - 1);
+    last_tag = *buf32; // upper right pixel
+    buf32 += bm_width;
+    for (int y=1; y<bm_height; y++) {
+        current_tag = *buf32;
+        if ((current_tag>0) || (current_tag!=last_tag)) {
+            right_edge.push_back((intvec3d_t){w, -y, 0});
+        }
+        last_tag = current_tag;
+        buf32 += bm_width;
+    }
+
+    push_triangles(Xp, right_center, right_edge[0], right_edge[right_edge.size()-1]);
+
+    for (j=1; j<right_edge.size(); j++) {
+        push_triangles(Xp, right_center, right_edge[j-1], right_edge[j]);
+    }
+
+    // upper strip - bottom edge
+    bottom_edge.push_back(ubr);
+    bottom_edge.push_back(lbr);
+    bottom_edge.push_back(lbl);
+    bottom_edge.push_back(ubl);
+    buf32 = tag_bitmap_i32;
+    buf32 += (bm_width*(bm_height-1));
+    last_tag = *buf32; // lower left pixel
+    buf32++;
+    for (int x=1; x<bm_width; x++) {
+        current_tag = *buf32;
+        if ((current_tag>0) || (current_tag!=last_tag)) {
+            bottom_edge.push_back((intvec3d_t){x, -h, 0});
+        }
+        last_tag = current_tag;
+        buf32++;
+    }
+
+    push_triangles(Yn, bottom_center, bottom_edge[0], bottom_edge[bottom_edge.size()-1]);
+
+    for (j=1; j<bottom_edge.size(); j++) {
+        push_triangles(Yn, bottom_center, bottom_edge[j-1], bottom_edge[j]);
+    }
+
+    // upper strip - left edge
+    left_edge.push_back(ubl);
+    left_edge.push_back(lbl);
+    left_edge.push_back(ltl);
+    left_edge.push_back(utl);
+    buf32 = tag_bitmap_i32;
+    last_tag = *buf32; // top left pixel
+    buf32 += bm_width;
+    for (int y=1; y<bm_height; y++) {
+        current_tag = *buf32;
+        if ((current_tag>0) || (current_tag!=last_tag)) {
+            left_edge.push_back((intvec3d_t){0, -y, 0});
+        }
+        last_tag = current_tag;
+        buf32 += bm_width;
+    }
+
+    push_triangles(Xn, left_center, left_edge[0], left_edge[left_edge.size()-1]);
+
+    for (j=1; j<left_edge.size(); j++) {
+        push_triangles(Xn, left_center, left_edge[j-1], left_edge[j]);
+    }
+
+    BLC += US;
+
 
     // NICK LAYERS
     for (int i; i< nicks.size(); i++) {
