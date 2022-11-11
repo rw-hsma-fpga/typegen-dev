@@ -19,12 +19,12 @@ space below refchar:
   unit: mm
 
 characters:
-  ASCII: ABCDEFGHIJKLMNOPQRSTUVWXYZ.
+  ASCII: GAT.
   unicode:
    - 0x2019
    # apostrophe used by the TTC
 
-nicks: 
+nicks:
   scale:
     value: 1.00
     unit: mm

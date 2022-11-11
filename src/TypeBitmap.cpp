@@ -1616,7 +1616,8 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
 
 
     // NICK LAYERS
-    for (int i; i< nicks.size(); i++) {
+    for (int i = 0; i< nicks.size(); i++) {
+
         // NICK HEIGHT
         int32_t NH = int32_t(round(nicks[i].z.as_mm() * UVstretchZ) / LH);
 
