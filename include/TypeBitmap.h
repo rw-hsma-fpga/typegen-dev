@@ -4,9 +4,9 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "t3t_support_types.h"
+#include "t3t_support_types.h" 
 
-enum reduced_foot_mode { no_foot , bevel, step};
+enum reduced_foot_mode { no_foot , bevel, step, supports};
 
 struct reduced_foot {
     reduced_foot_mode mode;

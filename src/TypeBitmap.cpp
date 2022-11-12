@@ -1181,6 +1181,10 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
         FZ = 0;
         FXY = 0;
     }
+    else if (foot.mode == supports) {
+        FZ = int32_t( round( (1.25 * UVstretchZ)/LH ) ); // TODO: fixed at 1.25mm for now, overriding YAML
+        FXY = 0; // none
+    }
     else {
         FZ = int32_t( round( (foot.Z.as_mm() * UVstretchZ)/LH ) );
         FXY = int32_t( round( foot.XY.as_mm()/RS  ) );
@@ -1762,6 +1766,8 @@ int TypeBitmap::generateMesh2(reduced_foot foot, std::vector<nick> &nicks, float
 
         BLC += NH;
     }
+
+
 
 
 

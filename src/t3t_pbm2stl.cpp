@@ -335,6 +335,8 @@ int parse_options(int ac, char* av[])
                 opts.foot.mode = bevel;
             else if (foot_mode_str=="step")
                 opts.foot.mode = step;
+            else if (foot_mode_str=="supports")
+                opts.foot.mode = supports;
             else
                 opts.foot.mode = no_foot;
         }
