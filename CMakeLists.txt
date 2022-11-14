@@ -18,6 +18,11 @@ add_executable(t3t_pbm2stl src/t3t_pbm2stl.cpp src/t3t_support_types.cpp)
 include_directories(./include/ /usr/local/include/yaml-cpp/)
 target_link_libraries(t3t_pbm2stl yaml-cpp boost_program_options typebitmap)
 
+project(t3t_text_composer VERSION 0.1)
+add_executable(t3t_text_composer src/t3t_text_composer.cpp src/t3t_support_types.cpp)
+include_directories(./include/ /usr/local/include/yaml-cpp/)
+target_link_libraries(t3t_text_composer yaml-cpp boost_program_options)
+
 project(t3t_STLcompiler VERSION 0.1)
 add_executable(t3t_STLcompiler src/t3t_STLcompiler.cpp src/t3t_support_types.cpp)
 include_directories(./include/ /usr/local/include/yaml-cpp/)

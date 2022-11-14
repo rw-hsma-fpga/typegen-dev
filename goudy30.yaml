@@ -14,14 +14,7 @@ space below refchar:
   value: 1.37
   unit: mm
 
-characters: AQ467
-
-#unicode:
-#  - 0xEB # e: diakrit
-#  - 0xEC # i` gravis
-
-# without U= for now
-#unicode: 0x45
+characters:
+  ASCII: AQ467
 
 
-# font scaling mode and parameters
