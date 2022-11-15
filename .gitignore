@@ -1,6 +1,9 @@
 *
 !*.c
+!src
+!src/*.cpp
 !*.cpp
+!include
 !include/*.h
 !*.sh
 !*.yaml

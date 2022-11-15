@@ -1,0 +1,68 @@
+# font
+font file: fonts/TOSUBBL.ttf
+
+working directory:
+  path: ./ttc48/
+  create: true
+
+body size:
+  value: 48
+  unit: pt
+
+# reference character is used to scale output to reference lead type
+reference character: E
+space above refchar:
+  value: 2.00
+  unit: mm
+space below refchar:
+  value: 1.00
+  unit: mm
+
+characters:
+  ASCII: TAG
+  #unicode:
+   #- 0x2019
+   # apostrophe used by the TTC
+
+type height:
+  value: 0.918
+  unit: inch
+
+depth of drive:
+  value: 2.0
+  unit: mm
+
+reduced foot mode: supports
+
+# printer: Elegoo Saturn 2
+raster size:
+  value: 0.0285
+  unit: mm
+
+layer height:
+  value: 0.050
+  unit: mm
+
+# Material: Anycubic Eco
+# UV curing time: 15min
+
+# measured shrinkage against intended size - needed for fudge factors
+XYshrink_pct: -0.75
+Zshrink_pct: -2.00
+
+
+nicks:
+  scale:
+    value: 1.00
+    unit: mm
+  segments: # should start and end with flat 1mm for now
+    - type: flat
+      z: 5.0
+    - type: triangle
+      z: 2.0
+    - type: flat
+      z: 3.0
+    - type: triangle
+      z: 2.0
+    - type: flat
+      z: 2.0
