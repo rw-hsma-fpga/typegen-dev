@@ -208,14 +208,14 @@ int PGMbitmap::loadPGM(std::string filename)
     std::erase(linebuf, '\r');
 
     uint8_t format;
-    if (linebuf=="P1") {
-        format = 1;
+    if (linebuf=="P2") {
+        format = 2;
     }
-    else if (linebuf=="P4") {
-        format = 4;
+    else if (linebuf=="P5") {
+        format = 5;
     }
     else {
-        std::cerr << "ERROR: Not a valid PBM file!" << std::endl;
+        std::cerr << "ERROR: Not a valid PGM file!" << std::endl;
         pgm.close();
         return -1;
     }
@@ -240,6 +240,8 @@ int PGMbitmap::loadPGM(std::string filename)
         return -1;
     }
 
+    pgm.get(); // whitespace after height
+
     bitmap = (uint8_t*)calloc(size = bm_width*bm_height, sizeof(uint8_t));
     if (bitmap == NULL) {
         std::cerr << "ERROR: Bitmap buffer allocation failed" << std::endl;
@@ -247,50 +249,69 @@ int PGMbitmap::loadPGM(std::string filename)
         return -1;
     }
 
+    // remove comments
+    while(pgm.peek()=='#')
+        getline(pgm, linebuf);
+
+    uint32_t max_val_u32;
+    if (!(pgm >> max_val_u32) || (0==max_val_u32)) {
+        std::cerr << "ERROR: No valid maximum value" << std::endl;
+        pgm.close();
+        return -1;
+    }
+    if (max_val_u32 > 255)
+        max_value = 255;
+    else
+        max_value = (uint8_t)max_val_u32;
+
+    pgm.get(); // whitespace after max value
+
     uint32_t count = 0;
     uint8_t *runbuf = bitmap;
 
-    // ASCII format (P1)
-    if (format==1) {
+    // ASCII format (P2)
+    if (format==2) {
         char c;
+        uint32_t value = 0;
 
-        c = pgm.get();
+        c = pgm.peek();
         while(!pgm.eof()) {
-            switch(c) {
-                case '#':
-                    getline(pgm, linebuf); break;
-                case '0':
-                case '1':
-                    if (count == size) {
-                        std::cerr << "ERROR: More data than specified." << std::endl;
-                        free(bitmap);
-                        bitmap = NULL;
-                        pgm.close();
-                        return -1;
-                    }
+            if ((c>='0') && (c<='9')) {
+                if (count == size) {
+                    std::cerr << "ERROR: More data than specified." << std::endl;
+                    free(bitmap);
+                    bitmap = NULL;
+                    pgm.close();
+                    return -1;
+                }
 
-                    if (c=='1')
-                        *(runbuf++) = 255;
-                    else
-                        *(runbuf++) = 0;
+                if (!(pgm >> value)) {
+                    std::cerr << "ERROR: Value read didn't work" << std::endl;
+                    pgm.close();
+                    return -1;
+                }
 
-                    count++;
-                    break;
-                default:
-                    break;
+                *(runbuf++) = (uint8_t)value;
+                count++;
             }
-            c = pgm.get();
+            else if (c=='#') {
+                getline(pgm, linebuf);
+            }
+            else
+                pgm.get(); // dismiss
+
+            c = pgm.peek();
+        }
+        if (count+1 == size) { // file likely ended after last digit
+            *(runbuf++) = value;
+            count++;
         }
     }
 
-    // Binary format (P4)
-    if (format==4) {
+    // Binary format (P5)
+    if (format==5) {
         uint8_t byte;
-        uint32_t x_cnt = 0;
-        uint32_t y_cnt = 0;
 
-        byte = (uint8_t)pgm.get(); // whitespace after height
-        
         byte = (uint8_t)pgm.get();
         while(!pgm.eof()) {
             if (count >= size) { // file should have ended
@@ -300,24 +321,9 @@ int PGMbitmap::loadPGM(std::string filename)
                 pgm.close();
                 return -1;
             }
-
-            for (int i=0; i<8; i++) {
-
-                if (byte & 0x80) { // start on MSB
-                    *(runbuf++) = 255;
-                }
-                else {
-                    *(runbuf++) = 0;
-                }
-                byte <<= 1;
-                count++;
-                x_cnt++;
-                if (x_cnt==bm_width) {
-                    x_cnt = 0;
-                    y_cnt++;
-                    break; // don't use rest of bit
-                }
-            }
+            *(runbuf++) = byte;
+            count++;
+            
             byte = (uint8_t)pgm.get();
         }
     }

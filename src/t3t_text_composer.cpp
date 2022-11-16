@@ -69,8 +69,9 @@ int main(int ac, char* av[])
         std::cout << std::endl;
     }
 
-    PGMbitmap BM(opts.work_path + "A.pbm");
-    BM.storePGM(opts.work_path + "A_grey.pgm");
+    PGMbitmap BM;
+    if (BM.loadPGM(opts.work_path + "test_grey.pgm")>=0)
+        BM.storePGM(opts.work_path + "test_grey2.pgm");
 
     return 0;
 }
