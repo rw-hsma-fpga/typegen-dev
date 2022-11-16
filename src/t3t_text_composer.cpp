@@ -23,7 +23,7 @@ struct {
 
 } opts = { .create_work_path = false };
 
-
+std::string make_ASCII_Unicode_string(uint32_t);
 int parse_options(int ac, char* av[]);
 int get_yaml_dim_node(YAML::Node &parent, std::string name, dim_t &target);
 
@@ -51,7 +51,7 @@ int main(int ac, char* av[])
     } 
 
     // begin temp
-    std::string lines[3] = {"HelloWorld","Screwyou","Loveunknowncoder"};
+    std::string lines[3] = {"Hello World!","Screw you.","Love, unknown coder"};
 
     for(int i=0; i<3; i++) {
         std::vector<uint32_t> vec;
@@ -62,18 +62,72 @@ int main(int ac, char* av[])
     }
     // end temp
 
+    uint32_t w,h,line_w, line_h;
+    uint32_t overall_w = 0;
+    uint32_t overall_h = 0;
+
     for(int i=0; i<opts.text.size(); i++) {
+        line_w = 0;
+        line_h = 0;
         for (int j=0; j<opts.text[i].size(); j++) {
-            std::cout << (char)opts.text[i][j];
+            //std::cout << (char)opts.text[i][j];
+            std::string char_filename = make_ASCII_Unicode_string(opts.text[i][j]);
+            std::string PBM_path = opts.work_path + char_filename + ".pbm";
+            PGMbitmap::parsePBM(PBM_path, w, h);
+            line_w += w;
+            if (line_h<h)
+                line_h = h;
+            //std::cout << char_filename << ": " << w << "x" << h << std::endl;
         }
-        std::cout << std::endl;
+        if (overall_w<line_w)
+                overall_w = line_w;
+        overall_h += line_h;
+        //std::cout << "Line: " << line_w << "x" << line_h << std::endl;
+    }
+    //std::cout << "Everything: " << overall_w << "x" << overall_h << std::endl;
+
+    PGMbitmap InPBM;
+    PGMbitmap OutPGM(overall_w, overall_h);
+
+    overall_h = 0;
+    for(int i=0; i<opts.text.size(); i++) {
+        line_w = 0;
+        line_h = 0;
+        for (int j=0; j<opts.text[i].size(); j++) {
+            std::string char_filename = make_ASCII_Unicode_string(opts.text[i][j]);
+            std::string PBM_path = opts.work_path + char_filename + ".pbm";
+            InPBM.loadPBM(PBM_path);
+            InPBM.mirror();
+            w = InPBM.getWidth();
+            h = InPBM.getHeight();
+            uint8_t *bitmap = InPBM.getAddress();
+            if (bitmap) {
+                OutPGM.pasteGlyph(bitmap, w, h, overall_h, line_w);
+                line_w += w;
+                if (line_h<h)
+                    line_h = h;
+            }
+        }
+        overall_h += line_h;
     }
 
-    PGMbitmap BM;
-    if (BM.loadPGM(opts.work_path + "test_grey.pgm")>=0)
-        BM.storePGM(opts.work_path + "test_grey2.pgm");
+    OutPGM.storePGM(opts.work_path + "composed_output.pgm");
 
     return 0;
+}
+
+std::string make_ASCII_Unicode_string(uint32_t unicode)
+{
+    if (unicode < 0x80) { // TODO: Special handling for special ASCII chars like space?
+        char asciistring[3];
+        sprintf(asciistring,"/%c", unicode);
+        return std::string(asciistring);
+    }
+    else {
+        char hexstring[8]; // TODO: 5-digit Unicode support?
+        sprintf(hexstring,"/U+%04x", unicode);
+        return std::string(hexstring);
+    }
 }
 
 int get_yaml_dim_node(YAML::Node &parent, std::string name, dim_t &target)

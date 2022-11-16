@@ -8,11 +8,11 @@
 
 
 PGMbitmap::PGMbitmap()
-            : loaded(false), bm_width(0), bm_height(0), bitmap(NULL) {}
+            : loaded(false), bm_width(0), bm_height(0), max_value(255), bitmap(NULL) {}
 
 
 PGMbitmap::PGMbitmap(std::string filename)
-            : loaded(false), bm_width(0), bm_height(0), bitmap(NULL)
+            : loaded(false), bm_width(0), bm_height(0), max_value(255), bitmap(NULL)
 {
     unload();
     if (filename.substr(filename.size()-3,3)=="pbm") {
@@ -24,7 +24,7 @@ PGMbitmap::PGMbitmap(std::string filename)
 
 
 PGMbitmap::PGMbitmap(uint32_t width, uint32_t height)
-            : loaded(false), bm_width(0), bm_height(0), bitmap(NULL)
+            : loaded(false), bm_width(0), bm_height(0), max_value(255), bitmap(NULL)
 {
     newBitmap(width, height);
 }
@@ -35,6 +35,7 @@ int PGMbitmap::newBitmap(uint32_t width, uint32_t height)
     unload();
     bm_width = width;
     bm_height = height;
+    max_value = 255;
 
     bitmap = (uint8_t*)calloc(bm_width*bm_height, sizeof(uint8_t));
 
@@ -52,6 +53,54 @@ PGMbitmap::~PGMbitmap() {
     unload();
 }
 
+
+int PGMbitmap::parsePBM(std::string filename, uint32_t &width, uint32_t &height)
+{
+    std::string linebuf;
+    uint32_t size;
+
+    std::ifstream pbm(filename);
+    if (!pbm.is_open())
+        return -1;
+
+    getline(pbm, linebuf);
+    std::erase(linebuf, '\r');
+
+    uint8_t format;
+    if (linebuf=="P1") {
+        format = 1;
+    }
+    else if (linebuf=="P4") {
+        format = 4;
+    }
+    else {
+        std::cerr << "ERROR: Not a valid PBM file!" << std::endl;
+        pbm.close();
+        return -1;
+    }
+
+    // remove comments
+    while(pbm.peek()=='#')
+        getline(pbm, linebuf);
+
+    if (!(pbm >> width) || (width==0)) {
+        std::cerr << "ERROR: No valid X dimension" << std::endl;
+        pbm.close();
+        return -1;
+    }
+
+    // remove comments
+    while(pbm.peek()=='#')
+        getline(pbm, linebuf);
+
+    if (!(pbm >> height) || (height==0)) {
+        std::cerr << "ERROR: No valid Y dimension" << std::endl;
+        pbm.close();
+        return -1;
+    }
+
+    return 0;
+}
 
 int PGMbitmap::loadPBM(std::string filename)
 {
@@ -350,6 +399,34 @@ void PGMbitmap::unload()
     }
     bitmap = NULL;
     loaded = false;
+}
+
+
+uint32_t PGMbitmap::getWidth()
+{
+    if (is_loaded())
+        return bm_width;
+    else
+        return 0;
+}
+
+
+uint32_t PGMbitmap::getHeight()
+{
+    if (is_loaded())
+        return bm_height;
+    else
+        return 0;
+}
+
+
+uint8_t* PGMbitmap::getAddress()
+{
+    if (is_loaded()) {
+        return bitmap;
+    }
+    else
+        return NULL;
 }
 
 

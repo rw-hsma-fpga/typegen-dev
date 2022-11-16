@@ -205,9 +205,11 @@ int main(int ac, char* av[])
             sprintf(hexstring,"/U+%04x",current_char);
             output_path = opts.work_path + std::string(hexstring) + ".pbm";
         }
-        //std::cout << "Storing " << output_path << std::endl;
-        TBM.store(output_path);
-            
+        std::cout << "Storing " << output_path << ": ";
+        if (TBM.store(output_path)<0)
+            std::cout << "failed." << std::endl;
+        else
+            std::cout << "Success." << std::endl;
     }
 
     FT_Done_Face(face);
