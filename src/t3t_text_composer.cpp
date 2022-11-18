@@ -50,12 +50,6 @@ int main(int ac, char* av[])
 
     std::vector<std::vector<uint32_t>> text;
 
-    // begin temp
-    std::vector<std::string> lines;
-    lines.push_back("The quick, brown");
-    lines.push_back("fox jumps over(!)");
-    lines.push_back("the lazy dog...");
-
     for(int i=0; i<3; i++) {
         std::vector<uint32_t> vec;
         text.push_back(vec);
@@ -63,7 +57,6 @@ int main(int ac, char* av[])
             if (opts.lines[i][j] == '_') { // unicode
                 size_t end = opts.lines[i].find('_', j+1);
                 if (end != std::string::npos) {
-                    //std::cout << end << "  " << opts.lines[i].substr(j+1, end-j-1) << std::endl;
                     text[i].push_back(strtoul(opts.lines[i].substr(j+1, end-j-1).c_str(),NULL,0));
                     j = end;
                 }
@@ -73,7 +66,6 @@ int main(int ac, char* av[])
                 text[i].push_back((uint32_t)opts.lines[i][j]);
         }
     }
-    // end temp
 
     uint32_t w,h,line_w, line_h;
     uint32_t overall_w = 0;
@@ -129,7 +121,7 @@ int main(int ac, char* av[])
         overall_h += line_h;
     }
 
-    OutPGM.storePGM(opts.work_path + "composed_output.pgm");
+    OutPGM.storePGM(opts.work_path + opts.pgm_path);
 
     return 0;
 }
