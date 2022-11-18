@@ -30,6 +30,14 @@ PGMbitmap::PGMbitmap(uint32_t width, uint32_t height)
 }
 
 
+PGMbitmap::PGMbitmap(uint32_t width, uint32_t height, uint8_t color)
+            : loaded(false), bm_width(0), bm_height(0), max_value(255), bitmap(NULL)
+{
+    newBitmap(width, height);
+    fill(color);
+}
+
+
 int PGMbitmap::newBitmap(uint32_t width, uint32_t height)
 {
     unload();
@@ -508,6 +516,53 @@ int PGMbitmap::pasteGlyph(uint8_t *glyph, uint32_t g_width, uint32_t g_height, u
 }
 
 
+int PGMbitmap::pastePGM(PGMbitmap &PGM, int32_t top_pos, int32_t left_pos, uint8_t background)
+{
+    int32_t g_x, g_y, bm_x, bm_y;
+    uint8_t glyph_value;
+
+    uint8_t *glyph = PGM.getAddress();
+    int32_t g_width = PGM.getWidth();
+    int32_t g_height = PGM.getHeight();
+
+    bool glyph_fits = true;
+    
+    if (glyph == NULL) {
+        std::cout << "ERROR: No glyph allocated to paste." << std::endl;
+        return -1;
+    }
+
+    for (g_y=0 ; g_y<g_height; g_y++) {
+        bm_y = g_y + top_pos;
+        if (bm_y >= bm_height) {
+            glyph_fits = false;
+            continue;
+        }
+
+        for (g_x=0 ; g_x<g_width; g_x++) {
+            bm_x = g_x + left_pos;
+            if (bm_x >= bm_width) {
+                glyph_fits = false;
+                continue;
+            }
+            
+            glyph_value = glyph[g_y*g_width + g_x];
+            if (255==glyph_value) {
+                glyph_value = background;
+            }
+            bitmap[bm_y*bm_width + bm_x] = glyph_value;
+        }
+    }
+
+    if (!glyph_fits) {
+        std::cout << "WARNING: Glyph didn't fit into bitmap." << std::endl;
+        return -1;
+    }
+
+    return 0;
+}
+
+
 void PGMbitmap::threshold(uint8_t thr) {
 
     uint32_t x, y;
@@ -554,5 +609,26 @@ void PGMbitmap::mirror() {
             buf[indexB] = swap;
         }
     }
+    return;
+}
+
+
+
+void PGMbitmap::fill(uint8_t color) {
+
+    uint32_t x, y;
+    uint32_t w = bm_width;
+    uint32_t h = bm_height;
+
+    uint8_t *buf = bitmap;
+    uint8_t swap;
+
+    if (!loaded)
+        return; //-1;
+
+    for (y = 0; y < h; y++)
+        for (x = 0; x < w; x++)
+            *buf++ = color;
+
     return;
 }

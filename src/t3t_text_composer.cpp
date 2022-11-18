@@ -51,7 +51,10 @@ int main(int ac, char* av[])
     } 
 
     // begin temp
-    std::string lines[3] = {"Hello World!","Screw you.","Love, unknown coder"};
+    std::string lines[3] = {
+                            "The quick, brown",
+                            "fox jumps over(!)",
+                            "the lazy dog..."};
 
     for(int i=0; i<3; i++) {
         std::vector<uint32_t> vec;
@@ -70,24 +73,24 @@ int main(int ac, char* av[])
         line_w = 0;
         line_h = 0;
         for (int j=0; j<opts.text[i].size(); j++) {
-            //std::cout << (char)opts.text[i][j];
             std::string char_filename = make_ASCII_Unicode_string(opts.text[i][j]);
             std::string PBM_path = opts.work_path + char_filename + ".pbm";
             PGMbitmap::parsePBM(PBM_path, w, h);
             line_w += w;
             if (line_h<h)
                 line_h = h;
-            //std::cout << char_filename << ": " << w << "x" << h << std::endl;
         }
         if (overall_w<line_w)
                 overall_w = line_w;
         overall_h += line_h;
-        //std::cout << "Line: " << line_w << "x" << line_h << std::endl;
     }
-    //std::cout << "Everything: " << overall_w << "x" << overall_h << std::endl;
 
     PGMbitmap InPBM;
-    PGMbitmap OutPGM(overall_w, overall_h);
+    PGMbitmap OutPGM(overall_w, overall_h, 255);
+
+    const uint8_t background_shades[4] = { 180, 210, 195, 225 };
+    const uint8_t num_shades = 4;
+    int shade_cnt = 0;
 
     overall_h = 0;
     for(int i=0; i<opts.text.size(); i++) {
@@ -102,7 +105,11 @@ int main(int ac, char* av[])
             h = InPBM.getHeight();
             uint8_t *bitmap = InPBM.getAddress();
             if (bitmap) {
-                OutPGM.pasteGlyph(bitmap, w, h, overall_h, line_w);
+                //OutPGM.pasteGlyph(bitmap, w, h, overall_h, line_w);
+                OutPGM.pastePGM(InPBM,
+                                overall_h, line_w,
+                                background_shades[shade_cnt]);
+                shade_cnt = (shade_cnt + 1) % num_shades;
                 line_w += w;
                 if (line_h<h)
                     line_h = h;
