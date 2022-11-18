@@ -45,6 +45,7 @@ struct {
 } opts = { .create_work_path = false, .XYshrink_pct = 0 };
 
 
+std::string make_ASCII_Unicode_string(uint32_t unicode);
 int parse_options(int ac, char* av[]);
 int get_yaml_dim_node(YAML::Node &parent, std::string name, dim_t &target);
 
@@ -190,21 +191,13 @@ int main(int ac, char* av[])
                                 body_size_px); //based on uncorrected dpi (ptsize)
         TBM.pasteGlyph((uint8_t *)(slot->bitmap.buffer), 
                         glyph_width_px, glyph_height_px, 
-                        char_top_start, char_left_start);
+                        char_top_start, char_left_start); 
 
         TBM.threshold(BW_THRESHOLD);
         TBM.mirror();
-        std::string output_path;
-        if (current_char < 0x80) {
-            char asciistring[3];
-            sprintf(asciistring,"/%c",current_char);
-            output_path = opts.work_path + std::string(asciistring) + ".pbm";
-        }
-        else {
-            char hexstring[8]; // TODO: 5-digit Unicode support?
-            sprintf(hexstring,"/U+%04x",current_char);
-            output_path = opts.work_path + std::string(hexstring) + ".pbm";
-        }
+        std::string output_path = 
+                    opts.work_path + make_ASCII_Unicode_string(current_char) + ".pbm";
+        TBM.store(output_path);
     }
 
     FT_Done_Face(face);
@@ -212,6 +205,21 @@ int main(int ac, char* av[])
     FT_Done_FreeType(library);
 
     return 0;
+}
+
+
+std::string make_ASCII_Unicode_string(uint32_t unicode)
+{
+    if (unicode < 0x80) { // TODO: Special handling for special ASCII chars like space?
+        char asciistring[3];
+        sprintf(asciistring,"/%c", unicode);
+        return std::string(asciistring);
+    }
+    else {
+        char hexstring[8]; // TODO: 5-digit Unicode support?
+        sprintf(hexstring,"/U+%04x", unicode);
+        return std::string(hexstring);
+    }
 }
 
 
@@ -314,7 +322,7 @@ int parse_options(int ac, char* av[])
             if (chars["unicode"]) {
                 for(int i=0; i<  chars["unicode"].size(); i++) {
                     uint32_t unicode = chars["unicode"][i].as<unsigned int>();
-                    //std::cout << "Unicode in config: " << unicode << std::endl;
+                    std::cout << "Unicode in config: " << unicode << std::endl;
                     opts.characters.push_back(unicode);
                 }
             }

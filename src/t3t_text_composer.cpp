@@ -13,13 +13,11 @@ namespace bpo = boost::program_options;
 
 
 struct {
-    std::string pbm_path;
+    std::string pgm_path;
     std::string work_path;
         bool create_work_path;
 
-    std::vector<uint32_t> characters;
-
-    std::vector<std::vector<uint32_t>> text;
+    std::vector<std::string> lines;
 
 } opts = { .create_work_path = false };
 
@@ -50,17 +48,29 @@ int main(int ac, char* av[])
         opts.work_path = "./";
     } 
 
+    std::vector<std::vector<uint32_t>> text;
+
     // begin temp
-    std::string lines[3] = {
-                            "The quick, brown",
-                            "fox jumps over(!)",
-                            "the lazy dog..."};
+    std::vector<std::string> lines;
+    lines.push_back("The quick, brown");
+    lines.push_back("fox jumps over(!)");
+    lines.push_back("the lazy dog...");
 
     for(int i=0; i<3; i++) {
         std::vector<uint32_t> vec;
-        opts.text.push_back(vec);
-        for (int j=0; j<lines[i].size(); j++) {
-            opts.text[i].push_back((uint32_t)lines[i][j]);
+        text.push_back(vec);
+        for (int j=0; j<opts.lines[i].size(); j++) {
+            if (opts.lines[i][j] == '_') { // unicode
+                size_t end = opts.lines[i].find('_', j+1);
+                if (end != std::string::npos) {
+                    //std::cout << end << "  " << opts.lines[i].substr(j+1, end-j-1) << std::endl;
+                    text[i].push_back(strtoul(opts.lines[i].substr(j+1, end-j-1).c_str(),NULL,0));
+                    j = end;
+                }
+                continue;
+            }
+            else
+                text[i].push_back((uint32_t)opts.lines[i][j]);
         }
     }
     // end temp
@@ -69,16 +79,17 @@ int main(int ac, char* av[])
     uint32_t overall_w = 0;
     uint32_t overall_h = 0;
 
-    for(int i=0; i<opts.text.size(); i++) {
+    for(int i=0; i<text.size(); i++) {
         line_w = 0;
         line_h = 0;
-        for (int j=0; j<opts.text[i].size(); j++) {
-            std::string char_filename = make_ASCII_Unicode_string(opts.text[i][j]);
+        for (int j=0; j<text[i].size(); j++) {
+            std::string char_filename = make_ASCII_Unicode_string(text[i][j]);
             std::string PBM_path = opts.work_path + char_filename + ".pbm";
-            PGMbitmap::parsePBM(PBM_path, w, h);
-            line_w += w;
-            if (line_h<h)
-                line_h = h;
+            if (PGMbitmap::parsePBM(PBM_path, w, h)>=0) {
+                line_w += w;
+                if (line_h<h)
+                    line_h = h;
+            }
         }
         if (overall_w<line_w)
                 overall_w = line_w;
@@ -93,26 +104,26 @@ int main(int ac, char* av[])
     int shade_cnt = 0;
 
     overall_h = 0;
-    for(int i=0; i<opts.text.size(); i++) {
+    for(int i=0; i<text.size(); i++) {
         line_w = 0;
         line_h = 0;
-        for (int j=0; j<opts.text[i].size(); j++) {
-            std::string char_filename = make_ASCII_Unicode_string(opts.text[i][j]);
+        for (int j=0; j<text[i].size(); j++) {
+            std::string char_filename = make_ASCII_Unicode_string(text[i][j]);
             std::string PBM_path = opts.work_path + char_filename + ".pbm";
-            InPBM.loadPBM(PBM_path);
-            InPBM.mirror();
-            w = InPBM.getWidth();
-            h = InPBM.getHeight();
-            uint8_t *bitmap = InPBM.getAddress();
-            if (bitmap) {
-                //OutPGM.pasteGlyph(bitmap, w, h, overall_h, line_w);
-                OutPGM.pastePGM(InPBM,
-                                overall_h, line_w,
-                                background_shades[shade_cnt], 0);
-                shade_cnt = (shade_cnt + 1) % num_shades;
-                line_w += w;
-                if (line_h<h)
-                    line_h = h;
+            if (InPBM.loadPBM(PBM_path)>=0) {
+                InPBM.mirror();
+                w = InPBM.getWidth();
+                h = InPBM.getHeight();
+                uint8_t *bitmap = InPBM.getAddress();
+                if (bitmap) {
+                    OutPGM.pastePGM(InPBM,
+                                    overall_h, line_w,
+                                    background_shades[shade_cnt], 0);
+                    shade_cnt = (shade_cnt + 1) % num_shades;
+                    line_w += w;
+                    if (line_h<h)
+                        line_h = h;
+                }
             }
         }
         overall_h += line_h;
@@ -159,7 +170,7 @@ int parse_options(int ac, char* av[])
         bpo::options_description desc("t3t_text_composer: Command-line options and arguments");
         desc.add_options()
             ("help", "produce this help message")
-            ("pgm,p", bpo::value<std::string>(&opts.pbm_path), "specify output PGM path")
+            ("pgm,p", bpo::value<std::string>(&opts.pgm_path), "specify output PGM path")
             ("workdir,w", bpo::value<std::string>(&opts.work_path), "working directory (overrides YAML)")            
             ("yaml,y", bpo::value< vector<string> >(&yaml_paths), "specify YAML configuration file(s)")
         ;
@@ -211,23 +222,17 @@ int parse_options(int ac, char* av[])
             }
         }
 
-        if (config["characters"]) {
-            YAML::Node chars = config["characters"];
-
-            if (chars["ASCII"]) {
-                std::string characters = chars["ASCII"].as<std::string>();
-                for(int i=0; i< characters.size(); i++) {
-                    //std::cout << "Unicode in config: " << (uint32_t)characters[i] << std::endl;
-                    opts.characters.push_back((uint32_t)characters[i]);
-
-                }
+        if (opts.pgm_path.empty()) {
+            if (config["composer output file"]) {
+                opts.pgm_path = config["composer output file"].as<std::string>();
             }
+        }
 
-            if (chars["unicode"]) {
-                for(int i=0; i<  chars["unicode"].size(); i++) {
-                    uint32_t unicode = chars["unicode"][i].as<unsigned int>();
-                    //std::cout << "Unicode in config: " << unicode << std::endl;
-                    opts.characters.push_back(unicode);
+        if (config["composer text"]) {
+            YAML::Node strings = config["composer text"];
+            if (strings.IsSequence()) {
+                for(int i=0; i<strings.size(); i++) {
+                    opts.lines.push_back(strings[i].as<std::string>());
                 }
             }
         }
