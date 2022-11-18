@@ -32,7 +32,7 @@ class PGMbitmap {
         int storePGM(std::string filename);
         int newBitmap(uint32_t width, uint32_t height);
         int pasteGlyph(uint8_t *glyph, uint32_t g_width, uint32_t g_height, uint32_t top_pos, uint32_t left_pos);
-        int pastePGM(PGMbitmap &PGM, int32_t top_pos, int32_t left_pos, uint8_t bg_shade = 255);
+        int pastePGM(PGMbitmap &PGM, int32_t top_pos, int32_t left_pos, uint8_t background = 255, uint8_t frame_width = 0);
         void threshold(uint8_t thr);
         void mirror();
         void fill(uint8_t);

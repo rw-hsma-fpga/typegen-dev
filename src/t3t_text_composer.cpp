@@ -108,7 +108,7 @@ int main(int ac, char* av[])
                 //OutPGM.pasteGlyph(bitmap, w, h, overall_h, line_w);
                 OutPGM.pastePGM(InPBM,
                                 overall_h, line_w,
-                                background_shades[shade_cnt]);
+                                background_shades[shade_cnt], 0);
                 shade_cnt = (shade_cnt + 1) % num_shades;
                 line_w += w;
                 if (line_h<h)
@@ -122,6 +122,7 @@ int main(int ac, char* av[])
 
     return 0;
 }
+
 
 std::string make_ASCII_Unicode_string(uint32_t unicode)
 {

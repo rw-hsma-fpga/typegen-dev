@@ -516,7 +516,7 @@ int PGMbitmap::pasteGlyph(uint8_t *glyph, uint32_t g_width, uint32_t g_height, u
 }
 
 
-int PGMbitmap::pastePGM(PGMbitmap &PGM, int32_t top_pos, int32_t left_pos, uint8_t background)
+int PGMbitmap::pastePGM(PGMbitmap &PGM, int32_t top_pos, int32_t left_pos, uint8_t background, uint8_t frame_width)
 {
     int32_t g_x, g_y, bm_x, bm_y;
     uint8_t glyph_value;
@@ -548,7 +548,16 @@ int PGMbitmap::pastePGM(PGMbitmap &PGM, int32_t top_pos, int32_t left_pos, uint8
             
             glyph_value = glyph[g_y*g_width + g_x];
             if (255==glyph_value) {
-                glyph_value = background;
+                if (frame_width != 0) {
+                    if ( (g_x - frame_width <0) ||
+                         (g_y - frame_width <0) ||
+                         (g_x + frame_width >= g_width) ||
+                         (g_y + frame_width >= g_height) ) {
+                        glyph_value = background;
+                    }
+                }
+                else
+                    glyph_value = background;
             }
             bitmap[bm_y*bm_width + bm_x] = glyph_value;
         }
