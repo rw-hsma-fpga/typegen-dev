@@ -1,0 +1,43 @@
+# font
+font file: fonts/GOUDOS.TTF
+
+working directory:
+  path: ./goudy24/
+  create: true
+
+body size:
+  value: 24
+  unit: pt
+
+# reference character is used to scale output to reference lead type
+reference character: 4
+space above refchar:
+  value: 0.62
+  unit: mm
+space below refchar:
+  value: 2.0
+  unit: mm
+
+characters:
+  ASCII: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ,.!?()"
+  unicode:
+    - 0x20AC
+
+composer text:
+  - "The quick and brown"
+  - "dog jumps right"
+  - "over that lazy fox"
+
+composer output file: composed.pgm
+
+nicks:
+  scale:
+    value: 1.00
+    unit: mm
+  segments: # should start and end with flat 1mm for now
+    - type: flat
+      z: 5.0
+    - type: triangle
+      z: 1.0
+    - type: flat
+      z: 2.0

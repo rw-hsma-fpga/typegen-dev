@@ -1,0 +1,41 @@
+# font
+font file: fonts/TOSUBBL.ttf
+
+working directory:
+  path: ./ttc30_big_supports/
+  create: true
+
+body size:
+  value: 30
+  unit: pt
+
+# reference character is used to scale output to reference lead type
+reference character: E
+space above refchar:
+  value: 3.00
+  unit: mm
+space below refchar:
+  value: 1.54
+  unit: mm
+
+characters:
+  ASCII: AELMSTUWY
+  #unicode:
+  #s - 0x2019
+   # apostrophe used by the TTC
+
+nicks:
+  scale:
+    value: 1.00
+    unit: mm
+  segments: # should start and end with flat 1mm for now
+    - type: flat
+      z: 7.0
+    - type: triangle
+      z: 2.0
+    - type: flat
+      z: 3.0
+#    - type: triangle
+#      z: 2.0
+#    - type: flat
+#      z: 2.0

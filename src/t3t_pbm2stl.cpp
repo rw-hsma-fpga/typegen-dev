@@ -34,6 +34,8 @@ struct {
     std::string ASCII; // for command-line input spec
     uint32_t unicode ; // for command-line input spec; overrides ASCII
 
+    std::vector<std::string> images;
+
     float XYshrink_pct;
     float UVstretchXY;
 
@@ -93,7 +95,7 @@ int main(int ac, char* av[])
             pbm_path = opts.work_path + opts.pbm_path;
         }
         else {
-            cerr << "Specified input bitmap file " << opts.pbm_path << " does not exist." << endl;
+            cerr << "Specified input bitmap file '" << (opts.work_path + opts.pbm_path) << "' does not exist." << endl;
             exit(1);
         }
     }
@@ -144,6 +146,15 @@ int main(int ac, char* av[])
             obj_path = opts.work_path + AU_string + ".obj";
 
             generate_3D_files(TBM, pbm_path, stl_path, obj_path);
+        }
+        for(int i=0; i<opts.images.size(); i++) {
+
+            pbm_path = opts.work_path + opts.images[i] + ".pbm";
+            stl_path = opts.work_path + opts.images[i] + ".stl";
+            obj_path = opts.work_path + opts.images[i] + ".obj";
+std::cout << "D1" << std::endl;
+            generate_3D_files(TBM, pbm_path, stl_path, obj_path);
+std::cout << "D2" << std::endl;
         }
     }
     return 0;
@@ -380,6 +391,15 @@ int parse_options(int ac, char* av[])
             if (chars["unicode"]) {
                 for(int i=0; i<  chars["unicode"].size(); i++)
                     opts.characters.push_back((uint32_t)chars["unicode"][i].as<int>());
+            }
+
+            if (chars["images"]) {
+                for(int i=0; i<  chars["images"].size(); i++) {
+                    std::string image = chars["images"][i].as<std::string>();
+                    if (image.ends_with(".pbm"))
+                        image.erase(image.length()-4);
+                    opts.images.push_back(image);
+                }
             }
         }
 

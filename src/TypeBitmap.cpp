@@ -404,7 +404,6 @@ void TypeBitmap::push_triangles(intvec3d_t N, intvec3d_t v1, intvec3d_t v2, intv
     Nb.x = Nf.x*cosrY + Nf.z*sinrY;
     Nb.y = Nf.y;
     Nb.z = -Nf.x*sinrY + Nf.z*cosrY;
-    //std::cout << "Norm after Y rot:  x=" << Nb.x << ", y=" << Nb.y << ", z=" << Nb.z << std::endl;
 
     if ((Nb.z==0) && (Nb.y==0)) { // don't turn around X
         cosrX = 1;
@@ -424,16 +423,16 @@ void TypeBitmap::push_triangles(intvec3d_t N, intvec3d_t v1, intvec3d_t v2, intv
         sinrX = sinf( rotX );
     }
 
-    /* full two-step X-Y for the record
-        pos3d_t P1 = { 1, 1, 0 };
-        Nb.x =  P1.x*cosrY + P1.z*sinrY;
-        Nb.y =  P1.y;
-        Nb.z = -P1.x*sinrY + P1.z*cosrY;
-        P1.x = Nb.x;
-        P1.y = Nb.y*cosrX - Nb.z*sinrX;
-        P1.z = Nb.y*sinrX + Nb.z*cosrX;
-        std::cout << "P1 after Y-X rot:  x=" << P1.x << ", y=" << P1.y << ", z=" << P1.z << std::endl;
-    */
+//     full two-step X-Y for the record
+//        pos3d_t P1 = { 1, 1, 0 };
+//        Nb.x =  P1.x*cosrY + P1.z*sinrY;
+//        Nb.y =  P1.y;
+//        Nb.z = -P1.x*sinrY + P1.z*cosrY;
+//        P1.x = Nb.x;
+//        P1.y = Nb.y*cosrX - Nb.z*sinrX;
+//        P1.z = Nb.y*sinrX + Nb.z*cosrX;
+//        std::cout << "P1 after Y-X rot:  x=" << P1.x << ", y=" << P1.y << ", z=" << P1.z << std::endl;
+
 
     for (int i=0; i<n; i++) {
         float x = float(proj[i].vert3d->x);
@@ -1008,8 +1007,6 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
     }
 
 
-
-
     // SINGLE PIXELS
     for (y = 0; y < bm_height; y++) {
         for (x = 0; x < bm_width; x++) {
@@ -1040,7 +1037,6 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
             // side walls of glyph
             if (buf32[y * w + x] > 0) {
                 
-
                 // left face
                 if ((x == 0) || (buf32[((y)*w) + (x - 1)] < 0)) {
                     push_triangles(Xn, ubl, utl, ltl, lbl);
@@ -1063,7 +1059,6 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
             }
         }
     }
-
 
     int32_t BLC = 0; // body layer count
 
@@ -1343,7 +1338,7 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         float body_size = (BS * raster_size.as_mm()) / UVstretchXY;
         const float side_support_width = 0.25; // mm
         const float half_support_width = 0.75; // mm    
-        const float min_support_interval = 5.0; // mm
+        const float min_support_interval = 3.0; // mm
         const float hollow_triangle_width = 1.25; // mm
         // unstretched calculations
         int32_t support_intervals = int((body_size-2*side_support_width)/min_support_interval); // rounded down

@@ -6,7 +6,7 @@ gap Y: 4.0
 
 
 working directory:
-  path: ./ttc48/
+  path: ./ttc24_big_supports/
   create: false # ignored by STLcompiler for now
 
 
@@ -14,10 +14,19 @@ working directory:
 
 # rows
 structure:
-#  - _1c _1b _1a A A B . C D D _2a _2b _2c
-  - LG SM A A B C D D k2 L2 SM_sp LG_sp
-  - E E E F F . G G H H I
-  - K L L L T T M M N N
-  - O T2 T2 P Q S S R R J 
-  - LG_sp SM_sp U U V W Y Y X Z I
-#  - _3c _3b _3a U U V W Y Y _4a _4b _4c
+  - A B C D E F G H I L N S
+  - O R S T U W A B C D E
+  - F G H I L N O R S T U
+  - A D E F G H I N O R S .
+  - T U W A D E G I N O R
+  - T U W D E I N O R S T .
+  - E N S T E N S T S W S
+
+
+#  - A A A A B B C C D D D D D
+#  - E E E E E E E F F F G G G G H H H
+#  - I I I I I L L N N N N N N N
+#  - O O O O O S S S S S S S S S R R R R R
+#  - T T T T T T T U U U U W W W W 
+
+

@@ -1,0 +1,28 @@
+
+working directory:
+  path: ./images/
+  create: true
+
+body size:
+  value: 72
+  unit: pt
+
+characters:
+  #ASCII: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ,.!?()"
+  #unicode:
+  #  - 0x20AC
+  images:
+    - M3.pbm
+    - Bletter.pbm
+
+nicks:
+  scale:
+    value: 1.00
+    unit: mm
+  segments: # should start and end with flat 1mm for now
+    - type: flat
+      z: 5.0
+    - type: triangle
+      z: 1.0
+    - type: flat
+      z: 2.0
