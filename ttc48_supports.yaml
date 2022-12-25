@@ -2,26 +2,26 @@
 font file: fonts/TOSUBBL.ttf
 
 working directory:
-  path: ./ttc24_big_supports/
+  path: ./ttc48_supports/
   create: true
 
 body size:
-  value: 24
+  value: 48
   unit: pt
 
 # reference character is used to scale output to reference lead type
 reference character: E
 space above refchar:
-  value: 1.43
+  value: 2.00
   unit: mm
 space below refchar:
   value: 1.00
   unit: mm
 
 characters:
-  ASCII: " ABCDEFGHIJKLMNOPQRSTUVWXYZ."
-  unicode:
-   - 0x2019
+  ASCII: AELMSTUWY
+#  unicode:
+#   - 0x2019
    # apostrophe used by the TTC
 
 nicks:
@@ -34,7 +34,7 @@ nicks:
     - type: triangle
       z: 2.0
     - type: flat
-      z: 2.0
+      z: 3.0
     - type: triangle
       z: 2.0
     - type: flat

@@ -1,27 +1,28 @@
 # font
-font file: fonts/TOSUBBL.ttf
+font file: fonts/Gadelica.ttf
 
 working directory:
-  path: ./ttc24_big_supports/
+  path: ./gadelica36_supports/
   create: true
 
 body size:
-  value: 24
+  value: 36
   unit: pt
 
 # reference character is used to scale output to reference lead type
-reference character: E
+reference character: A
 space above refchar:
-  value: 1.43
+  value: 3.00
   unit: mm
 space below refchar:
   value: 1.00
   unit: mm
 
 characters:
-  ASCII: " ABCDEFGHIJKLMNOPQRSTUVWXYZ."
+  ASCII: DHMORT! #ÁDHMÓROT
   unicode:
-   - 0x2019
+   - 0x00C1
+   - 0x00D3
    # apostrophe used by the TTC
 
 nicks:
@@ -30,11 +31,11 @@ nicks:
     unit: mm
   segments: # should start and end with flat 1mm for now
     - type: flat
-      z: 5.0
+      z: 4.0
     - type: triangle
       z: 2.0
     - type: flat
-      z: 2.0
+      z: 4.0
     - type: triangle
       z: 2.0
     - type: flat

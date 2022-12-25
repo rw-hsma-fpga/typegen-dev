@@ -1338,7 +1338,7 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         float body_size = (BS * raster_size.as_mm()) / UVstretchXY;
         const float side_support_width = 0.25; // mm
         const float half_support_width = 0.75; // mm    
-        const float min_support_interval = 3.0; // mm
+        const float min_support_interval = 4.0; // mm
         const float hollow_triangle_width = 1.25; // mm
         // unstretched calculations
         int32_t support_intervals = int((body_size-2*side_support_width)/min_support_interval); // rounded down
