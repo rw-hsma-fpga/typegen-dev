@@ -1,5 +1,6 @@
 #include "yaml.h"
 #include "TypeBitmap.h"
+#include "AppLog.h"
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -56,10 +57,17 @@ int shellcall(std::string cmd, std::string &result) {
 }
 
 
-
+AppLog logger("image2pbm", LOGMASK_NOINFO);
 
 int main(int ac, char* av[])
 {
+
+    logger.PRINT() << "t3t_image2pbm (v1.0)" << std::endl;
+    logger.INFO() << "Application started successfully" << std::endl;
+    logger.WARNING() << "Something strange with code " << 42 << std::endl;
+    logger.ERROR() << "FUBAR! Exiting. " << std::endl;
+    exit(1);
+
     parse_options(ac, av);
 
     std::string shell_output;
