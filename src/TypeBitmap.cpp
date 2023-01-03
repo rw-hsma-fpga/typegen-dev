@@ -1753,7 +1753,10 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         push_triangles(Zn, ltr, lbl, ltl, lbr);    
     }
     else if (foot.mode == supports) {
-        // TO DO - much lower
+        // Done in supports section above
+    }
+    else if (foot.mode == pyramids) {
+        // lower by pyramid foot height
     }
     else { // no reduced foot
         ltl = (intvec3d_t){0,  0, -BH};

@@ -353,8 +353,27 @@ int parse_options(int ac, char* av[])
                 opts.foot.mode = step;
             else if (foot_mode_str=="supports")
                 opts.foot.mode = supports;
+            else if (foot_mode_str=="pyramids")
+                opts.foot.mode = pyramids;
             else
                 opts.foot.mode = no_foot;
+        }
+
+        if (opts.foot.mode == pyramids) {
+            if (config["pyramid pitch"])
+                get_yaml_dim_node(config, "pyramid pitch", opts.foot.pyramid_pitch);
+            else
+                opts.foot.pyramid_pitch.set(0,mm);
+
+            if (config["pyramid top length"])
+                get_yaml_dim_node(config, "pyramid top length", opts.foot.pyramid_top_length);
+            else
+                opts.foot.pyramid_top_length.set(0,mm);
+
+            if (config["pyramid foot height"])
+                get_yaml_dim_node(config, "pyramid foot height", opts.foot.pyramid_foot_height);
+            else
+                opts.foot.pyramid_foot_height.set(0,mm);
         }
 
         // TODO: SANITY CHECK FOR TYPE HEIGHT

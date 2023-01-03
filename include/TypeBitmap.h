@@ -6,12 +6,21 @@
 #include <vector>
 #include "t3t_support_types.h" 
 
-enum reduced_foot_mode { no_foot , bevel, step, supports};
+enum reduced_foot_mode { no_foot, bevel, step, supports, pyramids};
 
 struct reduced_foot {
     reduced_foot_mode mode;
+
+    // parameters for bevel, step modes
     dim_t XY; // reduction on each edge
     dim_t Z;  // height of reduction
+
+    // parameters for pyramids mode
+    dim_t pyramid_pitch; // X/Y pitch for pyramids to be approximated
+    dim_t pyramid_top_length; // length of a side of cut-off pyramid
+    dim_t pyramid_foot_height; // Height of extra foot including pyramids
+
+    // constructor
     reduced_foot() { mode = no_foot; };
 };
 
