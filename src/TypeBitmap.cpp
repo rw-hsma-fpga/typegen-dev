@@ -1,4 +1,5 @@
 #include "TypeBitmap.h"
+#include "AppLog.h"
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -6,6 +7,7 @@
 #include <cmath>
 #include <boost/format.hpp> 
 
+extern AppLog logger;
 
 TypeBitmap::TypeBitmap()
             : loaded(false), bm_width(0), bm_height(0), bitmap(NULL), tag_bitmap_i32(NULL) {}
@@ -69,7 +71,7 @@ int TypeBitmap::load(std::string filename)
         format = 4;
     }
     else {
-        std::cerr << "ERROR: Not a valid PBM file!" << std::endl;
+        logger.ERROR() << "Not a valid PBM file!" << std::endl;
         pbm.close();
         return -1;
     }
@@ -79,7 +81,7 @@ int TypeBitmap::load(std::string filename)
         getline(pbm, linebuf);
 
     if (!(pbm >> bm_width) || (bm_width==0)) {
-        std::cerr << "ERROR: No valid X dimension" << std::endl;
+        logger.ERROR() << "No valid X dimension" << std::endl;
         pbm.close();
         return -1;
     }
@@ -89,14 +91,14 @@ int TypeBitmap::load(std::string filename)
         getline(pbm, linebuf);
 
     if (!(pbm >> bm_height) || (bm_height==0)) {
-        std::cerr << "ERROR: No valid Y dimension" << std::endl;
+        logger.ERROR() << "No valid Y dimension" << std::endl;
         pbm.close();
         return -1;
     }
 
     bitmap = (uint8_t*)calloc(size = bm_width*bm_height, sizeof(uint8_t));
     if (bitmap == NULL) {
-        std::cerr << "ERROR: Bitmap buffer allocation failed" << std::endl;
+        logger.ERROR() << "Bitmap buffer allocation failed" << std::endl;
         pbm.close();
         return -1;
     }
@@ -116,7 +118,7 @@ int TypeBitmap::load(std::string filename)
                 case '0':
                 case '1':
                     if (count == size) {
-                        std::cerr << "ERROR: More data than specified." << std::endl;
+                        logger.ERROR() << "More data than specified." << std::endl;
                         free(bitmap);
                         bitmap = NULL;
                         pbm.close();
@@ -148,7 +150,7 @@ int TypeBitmap::load(std::string filename)
         byte = (uint8_t)pbm.get();
         while(!pbm.eof()) {
             if (count >= size) { // file should have ended
-                std::cerr << "ERROR: More data than specified." << std::endl;
+                logger.ERROR() << "More data than specified." << std::endl;
                 free(bitmap);
                 bitmap = NULL;
                 pbm.close();
@@ -177,7 +179,7 @@ int TypeBitmap::load(std::string filename)
     }
 
     if (count != size) {
-        std::cerr << "Less data than specified." << std::endl;
+        logger.ERROR() << "Less data than specified." << std::endl;
         free(bitmap);
         bitmap = NULL;
         pbm.close();
@@ -217,13 +219,13 @@ int TypeBitmap::store(std::string filename)
     uint32_t x, y;
 
     if (!loaded) {
-        std::cerr << "ERROR: No bitmap to store." << std::endl;
+        logger.ERROR() << "No bitmap to store." << std::endl;
         return -1;
     }
 
     std::ofstream pbm(filename);
     if (!pbm.is_open()) {
-        std::cerr << "ERROR: Opening " << filename <<" for writing failed." << std::endl;
+        logger.ERROR() << "Opening " << filename <<" for writing failed." << std::endl;
         return -1;
     }
 
@@ -254,7 +256,7 @@ int TypeBitmap::pasteGlyph(uint8_t *glyph, uint32_t g_width, uint32_t g_height, 
     bool glyph_fits = true;
     
     if (glyph == NULL) {
-        std::cout << "ERROR: No glyph allocated to paste." << std::endl;
+        logger.ERROR() << "No glyph allocated to paste." << std::endl;
         return -1;
     }
 
@@ -277,7 +279,7 @@ int TypeBitmap::pasteGlyph(uint8_t *glyph, uint32_t g_width, uint32_t g_height, 
     }
 
     if (!glyph_fits) {
-        std::cout << "WARNING: Glyph didn't fit into bitmap." << std::endl;
+        logger.WARNING() << " Glyph didn't fit into bitmap." << std::endl;
         return -1;
     }
 
@@ -546,7 +548,7 @@ int TypeBitmap::find_rectangles(void)
 
     if (!loaded)
     {
-        std::cerr << "ERROR: No Bitmap loaded." << std::endl;
+        logger.ERROR() << "No Bitmap loaded." << std::endl;
         return -1;
     }
 
@@ -555,7 +557,7 @@ int TypeBitmap::find_rectangles(void)
 
     tag_bitmap_i32 = (int32_t*)calloc(w*h, sizeof(int32_t));
     if (tag_bitmap_i32 == NULL) {
-        std::cerr << "ERROR: Could not allocate tag bitmap." << std::endl;
+        logger.ERROR() << "Could not allocate tag bitmap." << std::endl;
         return -1;
     }
     buf32 = tag_bitmap_i32;
@@ -762,7 +764,7 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
 
     if (!loaded)
     {
-        std::cerr << "ERROR: No Bitmap loaded." << std::endl;
+        logger.ERROR() << "No Bitmap loaded." << std::endl;
         return -1;
     }
 
@@ -1345,10 +1347,10 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         float support_interval = ((body_size-2*side_support_width)/support_intervals);
         float interval_gap = support_interval - (2 * hollow_triangle_width);
         float triangle_support_gap = hollow_triangle_width - half_support_width;
-        std::cout << "#support intervals: " << support_intervals << std::endl
-                  << "#support intervals(mm): " << support_interval << std::endl
-                  << "#intervals gap(mm): " << interval_gap << std::endl
-                  << "triangle_support_gap(mm): " << triangle_support_gap << std::endl;
+        logger.INFO() << "#support intervals: " << support_intervals << std::endl
+                  << "      #support intervals(mm): " << support_interval << std::endl
+                  << "      #intervals gap(mm): " << interval_gap << std::endl
+                  << "      triangle_support_gap(mm): " << triangle_support_gap << std::endl;
 
         // stretch + discretize
         int32_t SI  = round((support_interval*UVstretchXY) / raster_size.as_mm());
@@ -1776,17 +1778,17 @@ int TypeBitmap::writeOBJ(std::string filename)
 
     if (filename.empty())
     {
-        std::cerr << "ERROR: No OBJ file specified." << std::endl;
+        logger.ERROR() << "No OBJ file specified." << std::endl;
         return -1;
     }
 
     std::ofstream obj_out(filename, std::ios::binary);
     if (!obj_out.is_open()) {
-        std::cerr << "ERROR: Could not open OBJ file " << filename <<" for writing." << std::endl;
+        logger.ERROR() << "Could not open OBJ file " << filename <<" for writing." << std::endl;
         return -1;
     }
 
-    std::cout << "Triangle count is " << triangles.size() << std::endl;
+    logger.INFO() << "Triangle count is " << triangles.size() << std::endl;
 
     obj_out << "### OBJ data exported from t3t_pbm2stl:" << std::endl;
 
@@ -1815,14 +1817,14 @@ int TypeBitmap::writeOBJ(std::string filename)
     }
     obj_out.close();
 
-    std::cout << "Wrote binary STL data to " << filename << std::endl;
-    std::cout << "---------------------" << std::endl;
-    std::cout << "Exported STL metrics:" << std::endl;
-    std::cout << "Type height   " << boost::format("%6.4f") % type_height.as_inch()
+    logger.INFO() << "Wrote binary STL data to " << filename << std::endl;
+    logger.INFO() << "---------------------" << std::endl;
+    logger.INFO() << "Exported STL metrics:" << std::endl;
+    logger.INFO() << "Type height   " << boost::format("%6.4f") % type_height.as_inch()
               << " inch  |  "  << boost::format("%6.3f") %  type_height.as_mm() << " mm" << std::endl;
-    std::cout << "Body size     " << boost::format("%6.4f") % (h*raster_size.as_inch())
+    logger.INFO() << "Body size     " << boost::format("%6.4f") % (h*raster_size.as_inch())
               << " inch  |  "  << boost::format("%6.3f") %  (h*raster_size.as_mm()) << " mm" << std::endl;
-    std::cout << "Set width     " << boost::format("%6.4f") % (w*raster_size.as_inch())
+    logger.INFO() << "Set width     " << boost::format("%6.4f") % (w*raster_size.as_inch())
               << " inch  |  "  << boost::format("%6.3f") %  (w*raster_size.as_mm()) << " mm" << std::endl;
 
     return 0;
@@ -1840,17 +1842,17 @@ int TypeBitmap::writeSTL(std::string filename)
 
     if (filename.empty())
     {
-        std::cerr << "ERROR: No STL file specified." << std::endl;
+        logger.ERROR() << "No STL file specified." << std::endl;
         return -1;
     }
 
     std::ofstream stl_out(filename, std::ios::binary);
     if (!stl_out.is_open()) {
-        std::cerr << "ERROR: Could not open STL file " << filename <<" for writing." << std::endl;
+        logger.ERROR() << "Could not open STL file " << filename <<" for writing." << std::endl;
         return -1;
     }
 
-    std::cout << "Triangle count is " << triangles.size() << std::endl;
+    logger.INFO() << "Triangle count is " << triangles.size() << std::endl;
 
     // 80 byte header - content anything but "solid" (would indicated ASCII encoding)
     for (i = 0; i < 80; i++)
@@ -1879,14 +1881,14 @@ int TypeBitmap::writeSTL(std::string filename)
     stl_out.close();
 
 
-    std::cout << "Wrote binary STL data to " << filename << std::endl;
-    std::cout << "---------------------" << std::endl;
-    std::cout << "Exported STL metrics:" << std::endl;
-    std::cout << "Type height   " << boost::format("%6.4f") % type_height.as_inch()
+    logger.INFO() << "Wrote binary STL data to " << filename << std::endl;
+    logger.INFO() << "---------------------" << std::endl;
+    logger.INFO() << "Exported STL metrics:" << std::endl;
+    logger.INFO() << "Type height   " << boost::format("%6.4f") % type_height.as_inch()
               << " inch  |  "  << boost::format("%6.3f") %  type_height.as_mm() << " mm" << std::endl;
-    std::cout << "Body size     " << boost::format("%6.4f") % (h*raster_size.as_inch())
+    logger.INFO() << "Body size     " << boost::format("%6.4f") % (h*raster_size.as_inch())
               << " inch  |  "  << boost::format("%6.3f") %  (h*raster_size.as_mm()) << " mm" << std::endl;
-    std::cout << "Set width     " << boost::format("%6.4f") % (w*raster_size.as_inch())
+    logger.INFO() << "Set width     " << boost::format("%6.4f") % (w*raster_size.as_inch())
               << " inch  |  "  << boost::format("%6.3f") %  (w*raster_size.as_mm()) << " mm" << std::endl;
 
     return 0;

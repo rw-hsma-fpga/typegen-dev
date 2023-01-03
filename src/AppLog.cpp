@@ -9,6 +9,12 @@ void teebuf::connect(std::streambuf * sbuf1, std::streambuf * sbuf2)
         sb2 = sbuf2;
     }
 
+void teebuf::connect(std::streambuf * sbuf1)
+    {
+        sb1 = sbuf1;
+        sb2 = NULL;
+    }
+
  int teebuf::overflow(int c)
 {
     if (c == EOF)
@@ -17,18 +23,30 @@ void teebuf::connect(std::streambuf * sbuf1, std::streambuf * sbuf2)
     }
     else
     {
-        int const r1 = sb1->sputc(c);
-        int const r2 = sb2->sputc(c);
-        return r1 == EOF || r2 == EOF ? EOF : c;
+        if (sb2) {
+            int const r1 = sb1->sputc(c);
+            int const r2 = sb2->sputc(c);
+            return r1 == EOF || r2 == EOF ? EOF : c;
+        }
+        else {
+            int const r1 = sb1->sputc(c);
+            return r1 == EOF ? EOF : c;
+        }
     }
 }
 
 // Sync both teed buffers.
  int teebuf::sync()
 {
-    int const r1 = sb1->pubsync();
-    int const r2 = sb2->pubsync();
-    return r1 == 0 && r2 == 0 ? 0 : -1;
+    if (sb2) {
+        int const r1 = sb1->pubsync();
+        int const r2 = sb2->pubsync();
+        return r1 == 0 && r2 == 0 ? 0 : -1;
+    }
+    else {
+        int const r1 = sb1->pubsync();
+        return r1;
+    }
 }   
 
 
@@ -40,6 +58,11 @@ teestream::teestream()
 void teestream::connect(std::ostream & o1, std::ostream & o2)
 {
     tbuf.connect(o1.rdbuf(), o2.rdbuf());
+}
+
+void teestream::connect(std::ostream & o1)
+{
+    tbuf.connect(o1.rdbuf());
 }
 
 
@@ -57,22 +80,22 @@ AppLog::AppLog(std::string log_name, uint32_t printmask) : opened(false), stream
     if (printmask & LOGMASK_PRINT)
         print.connect(std::cout, log_stream);
     else
-        print.connect(nullstream, log_stream);
+        print.connect(log_stream);
 
     if (printmask & LOGMASK_INFO)
         info.connect(std::cout, log_stream);
     else
-        info.connect(nullstream, log_stream);
+        info.connect(log_stream);
 
     if (printmask & LOGMASK_WARNING)
         warning.connect(std::cerr, log_stream);
     else
-        warning.connect(nullstream, log_stream);
+        warning.connect(log_stream);
 
     if (printmask & LOGMASK_ERROR)
         error.connect(std::cerr, log_stream);
     else
-        error.connect(nullstream, log_stream);
+        error.connect(log_stream);
 
 }
 

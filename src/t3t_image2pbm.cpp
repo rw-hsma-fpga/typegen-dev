@@ -58,23 +58,24 @@ int shellcall(std::string cmd, std::string &result) {
 
 
 AppLog logger("image2pbm", LOGMASK_NOINFO);
+const std::string version("(v0.1)");
 
 int main(int ac, char* av[])
 {
 
-    logger.PRINT() << "t3t_image2pbm (v1.0)" << std::endl;
-    logger.INFO() << "Application started successfully" << std::endl;
-    logger.WARNING() << "Something strange with code " << 42 << std::endl;
-    logger.ERROR() << "FUBAR! Exiting. " << std::endl;
-    exit(1);
+    logger.PRINT() << "t3t_image2pbm " << version << std::endl;
+    //logger.INFO() << "Application started successfully" << std::endl;
+    //logger.WARNING() << "Something strange with code " << 42 << std::endl;
+    //logger.ERROR() << "FUBAR! Exiting. " << std::endl;
+    //exit(1);
 
     parse_options(ac, av);
 
     std::string shell_output;
 
     if (shellcall("which convert", shell_output) != 0) {
-        std::cerr << "ERROR: 'convert' tool not found." << std::endl;
-        std::cerr << "       Please install ImageMagick package before using t3t_image2pbm" << std::endl;
+        logger.ERROR() << "'convert' tool not found." << std::endl
+                << "       Please install ImageMagick package before using t3t_image2pbm" << std::endl;
         exit(1);
     }
 
@@ -82,12 +83,12 @@ int main(int ac, char* av[])
         if (!fs::exists(opts.work_path)) {
             if (opts.create_work_path) {
                 if (!fs::create_directory(opts.work_path)) {
-                    cerr << "Creating work directory " << opts.work_path << " failed." << endl;
+                    logger.ERROR() << "Creating work directory " << opts.work_path << " failed." << endl;
                     exit(1);
                 }            
             }
             else {
-                cerr << "Specified work directory " << opts.work_path << " does not exist." << endl;
+                logger.ERROR() << "Specified work directory " << opts.work_path << " does not exist." << endl;
                 exit(1);
             }
         }
@@ -97,7 +98,7 @@ int main(int ac, char* av[])
     } 
 
     float UVstretchXY = (float)100 / ((float)100 + opts.XYshrink_pct);
-    cout << "XY stretch to compensate UV shrinking: " << UVstretchXY << endl;
+    logger.INFO() << "XY stretch to compensate UV shrinking: " << UVstretchXY << endl;
 
     float dpi = (1 / (opts.raster_size.as_inch() / UVstretchXY )); /// UVstretchXY
     int ptsize =  round(opts.body_size.as_pt());
@@ -106,12 +107,12 @@ int main(int ac, char* av[])
 
     std::stringstream convert_call;
     convert_call << "convert" << " " << opts.image_path << " -threshold 50% -resize x" << body_size << " " << opts.image_path << ".pbm";
-    std::cout << convert_call.str() << std::endl;
+    logger.PRINT() << convert_call.str() << std::endl;
 
     int shell_call_code;
     shell_call_code = shellcall(convert_call.str(), shell_output);
     if (shell_call_code != 0) {
-        std::cerr << "ERROR: Converting " << opts.image_path << "to PBM failed with error code " << shell_call_code << std::endl;
+       logger.ERROR() << "Converting " << opts.image_path << "to PBM failed with error code " << shell_call_code << std::endl;
         exit(shell_call_code);
     }
 
@@ -168,7 +169,7 @@ int parse_options(int ac, char* av[])
         bpo::notify(vm);
 
         if (vm.count("help")) {
-            cout << desc << "\n";
+            logger.PRINT() << desc << "\n";
             exit(0);
         }
 
@@ -214,7 +215,7 @@ int parse_options(int ac, char* av[])
 
     }
     catch(exception& e) {
-        cerr << "error: " << e.what() << "\n";
+        logger.ERROR() << e.what() << "\n";
         return 1;
     }
     return 0;

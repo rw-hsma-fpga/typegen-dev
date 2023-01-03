@@ -1,5 +1,6 @@
 #include "yaml.h"
 #include "TypeBitmap.h"
+#include "AppLog.h"
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -13,61 +14,66 @@ namespace fs = std::filesystem;
 namespace bpo = boost::program_options;
 
 
-struct {
-    dim_t type_height; 
-    dim_t depth_of_drive;
+    struct {
+        dim_t type_height; 
+        dim_t depth_of_drive;
 
-    dim_t raster_size;
-    dim_t layer_height;
+        dim_t raster_size;
+        dim_t layer_height;
 
-    reduced_foot foot;
+        reduced_foot foot;
 
-    std::vector<nick> nicks;
+        std::vector<nick> nicks;
 
-    std::string pbm_path;
-    std::string stl_path;
-    std::string obj_path;
-    std::string work_path;
-        bool create_work_path;    
+        std::string pbm_path;
+        std::string stl_path;
+        std::string obj_path;
+        std::string work_path;
+            bool create_work_path;    
 
-    std::vector<uint32_t> characters;
-    std::string ASCII; // for command-line input spec
-    uint32_t unicode ; // for command-line input spec; overrides ASCII
+        std::vector<uint32_t> characters;
+        std::string ASCII; // for command-line input spec
+        uint32_t unicode ; // for command-line input spec; overrides ASCII
 
-    std::vector<std::string> images;
+        std::vector<std::string> images;
 
-    float XYshrink_pct;
-    float UVstretchXY;
+        float XYshrink_pct;
+        float UVstretchXY;
 
-    float Zshrink_pct;
-    float UVstretchZ;
+        float Zshrink_pct;
+        float UVstretchZ;
 
-} opts = { .create_work_path = false, .unicode = 0, .XYshrink_pct = 0, .Zshrink_pct = 0 };
+    } opts = { .create_work_path = false, .unicode = 0, .XYshrink_pct = 0, .Zshrink_pct = 0 };
 
-std::string make_ASCII_Unicode_string(uint32_t);
-int generate_3D_files(TypeBitmap &TBM, std::string pbm_path, std::string stl_path, std::string obj_path);
-int parse_options(int ac, char* av[]);
-int get_yaml_dim_node(YAML::Node &parent, std::string name, dim_t &target);
+    std::string make_ASCII_Unicode_string(uint32_t);
+    int generate_3D_files(TypeBitmap &TBM, std::string pbm_path, std::string stl_path, std::string obj_path);
+    int parse_options(int ac, char* av[]);
+    int get_yaml_dim_node(YAML::Node &parent, std::string name, dim_t &target);
+
+    AppLog logger("pbm2stl", LOGMASK_NOINFO);
+    const std::string version("(v0.5)");
 
 
 int main(int ac, char* av[])
 {
+    logger.PRINT() << "t3t_pbm2stl " << version << std::endl;
+
     parse_options(ac, av);
 
     opts.UVstretchZ = (float)100 / ((float)100 + opts.Zshrink_pct);
-    cout << "Z stretch to compensate UV shrinking: " << opts.UVstretchZ << endl;
+    logger.INFO() << "Z stretch to compensate UV shrinking: " << opts.UVstretchZ << endl;
     opts.UVstretchXY = (float)100 / ((float)100 + opts.XYshrink_pct);
 
     if (!opts.work_path.empty()) {
         if (!fs::exists(opts.work_path)) {
             if (opts.create_work_path) {
                 if (!fs::create_directory(opts.work_path)) {
-                    cerr << "Creating work directory " << opts.work_path << " failed." << endl;
+                    logger.ERROR() << "Creating work directory " << opts.work_path << " failed." << endl;
                     exit(1);
                 }            
             }
             else {
-                cerr << "Specified work directory " << opts.work_path << " does not exist." << endl;
+                logger.ERROR() << "Specified work directory " << opts.work_path << " does not exist." << endl;
                 exit(1);
             }
         }
@@ -95,7 +101,7 @@ int main(int ac, char* av[])
             pbm_path = opts.work_path + opts.pbm_path;
         }
         else {
-            cerr << "Specified input bitmap file '" << (opts.work_path + opts.pbm_path) << "' does not exist." << endl;
+            logger.ERROR() << "Specified input bitmap file '" << (opts.work_path + opts.pbm_path) << "' does not exist." << endl;
             exit(1);
         }
     }
@@ -152,9 +158,8 @@ int main(int ac, char* av[])
             pbm_path = opts.work_path + opts.images[i] + ".pbm";
             stl_path = opts.work_path + opts.images[i] + ".stl";
             obj_path = opts.work_path + opts.images[i] + ".obj";
-std::cout << "D1" << std::endl;
+
             generate_3D_files(TBM, pbm_path, stl_path, obj_path);
-std::cout << "D2" << std::endl;
         }
     }
     return 0;
@@ -234,7 +239,7 @@ int parse_options(int ac, char* av[])
         bpo::notify(vm);
 
         if (vm.count("help")) {
-            cout << desc << "\n";
+            logger.PRINT() << desc << "\n";
             exit(0);
         }
 
@@ -310,7 +315,7 @@ int parse_options(int ac, char* av[])
                             current_nick.type = circle;
 
                         if (current_nick.type == nick_undefined) {
-                            std::cerr << "WARNING: No valid nick type specified" << std::endl;
+                            logger.WARNING() << "No valid nick type specified" << std::endl;
                             continue;
                         }
 
@@ -319,7 +324,7 @@ int parse_options(int ac, char* av[])
                             current_nick.z = dim_t(z * nick_scale.as_mm(), mm);
                         }
                         if (current_nick.z.as_mm() == 0) {
-                            std::cerr << "WARNING: Nick with no height specified" << std::endl;
+                            logger.WARNING() << "Nick with no height specified" << std::endl;
                             continue;
                         }
                             
@@ -329,7 +334,7 @@ int parse_options(int ac, char* av[])
                         }
                         if ((current_nick.type == rect) && 
                             (current_nick.y.as_mm() == 0) ) {
-                            std::cerr << "WARNING: Rectangular nick with no depth specified" << std::endl;
+                            logger.WARNING() << "Rectangular nick with no depth specified" << std::endl;
                             continue;
                         }
 
@@ -363,7 +368,7 @@ int parse_options(int ac, char* av[])
         }
 
         if (height_sum_mm > opts.type_height.as_mm()) {
-            std::cerr << "ERROR: Specified type height components (Depth of drive, margins, nicks, reduced foot)" << std::endl
+            logger.ERROR() << "Specified type height components (Depth of drive, margins, nicks, reduced foot)" << std::endl
                       << "       bigger than specified Type Height" << std::endl;
             // TODO: List components
             exit(1);
@@ -413,7 +418,7 @@ int parse_options(int ac, char* av[])
 
     }
     catch(exception& e) {
-        cerr << "error: " << e.what() << "\n";
+        logger.ERROR() << e.what() << "\n";
         return 1;
     }
     return 0;

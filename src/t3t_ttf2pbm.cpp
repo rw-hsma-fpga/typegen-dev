@@ -1,5 +1,6 @@
 #include "yaml.h"
 #include "TypeBitmap.h"
+#include "AppLog.h"
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -16,57 +17,63 @@ extern "C" {
     #include FT_FREETYPE_H
 }
 
-inline float i26_6_to_float(uint32_t in)
-{
-    return (float)(in >> 6) + (float)(in & 0x3f)/64;
-}
+    inline float i26_6_to_float(uint32_t in)
+    {
+        return (float)(in >> 6) + (float)(in & 0x3f)/64;
+    }
 
 
-const uint8_t BW_THRESHOLD = 1;
+    const uint8_t BW_THRESHOLD = 1;
 
 
-struct {
-    dim_t raster_size;
-    dim_t body_size;
+    struct {
+        dim_t raster_size;
+        dim_t body_size;
 
-    std::string font_path;
-    std::string pbm_path;
-    std::string work_path;
-        bool create_work_path;
+        std::string font_path;
+        std::string pbm_path;
+        std::string work_path;
+            bool create_work_path;
 
-    std::vector<uint32_t> characters;
+        std::vector<uint32_t> characters;
 
-    std::string ref_char;
-    dim_t above_ref_char;
-    dim_t below_ref_char;
+        std::string ref_char;
+        dim_t above_ref_char;
+        dim_t below_ref_char;
 
-    float XYshrink_pct;
+        float XYshrink_pct;
 
-} opts = { .create_work_path = false, .XYshrink_pct = 0 };
+    } opts = { .create_work_path = false, .XYshrink_pct = 0 };
 
 
-std::string make_ASCII_Unicode_string(uint32_t unicode);
-int parse_options(int ac, char* av[]);
-int get_yaml_dim_node(YAML::Node &parent, std::string name, dim_t &target);
+    std::string make_ASCII_Unicode_string(uint32_t unicode);
+    int parse_options(int ac, char* av[]);
+    int get_yaml_dim_node(YAML::Node &parent, std::string name, dim_t &target);
+
+
+    AppLog logger("ttf2pbm", LOGMASK_NOINFO);
+    const std::string version("(v0.5)");
 
 
 int main(int ac, char* av[])
 {
+    logger.PRINT() << "t3t_ttf2pbm " << version << std::endl;
+
     parse_options(ac, av);
 
     float UVstretchXY = (float)100 / ((float)100 + opts.XYshrink_pct);
-    cout << "XY stretch to compensate UV shrinking: " << UVstretchXY << endl;
+    logger.INFO() << "XY stretch to compensate UV shrinking: " << UVstretchXY << endl;
 
     if (!opts.work_path.empty()) {
         if (!fs::exists(opts.work_path)) {
             if (opts.create_work_path) {
                 if (!fs::create_directory(opts.work_path)) {
-                    cerr << "Creating work directory " << opts.work_path << " failed." << endl;
+                    logger.ERROR() << "Creating work directory " << opts.work_path << " failed." << endl;
                     exit(1);
                 }            
             }
             else {
-                cerr << "Specified work directory " << opts.work_path << " does not exist." << endl;
+                logger.ERROR() << "Specified work directory " << opts.work_path << " does not exist." << endl;
                 exit(1);
             }
         }
@@ -82,24 +89,24 @@ int main(int ac, char* av[])
     FT_Error error;
 
     if (opts.font_path.empty()) {
-        std::cerr << "ERROR: No font file specified." << std::endl;
+        logger.ERROR() << "No font file specified." << std::endl;
         exit(1);
     }
 
     if (opts.characters.empty()) {
-        std::cerr << "ERROR: No characters oder unicodes specified." << std::endl;
+        logger.ERROR() << "No characters oder unicodes specified." << std::endl;
         exit(1);
     }
 
     error = FT_Init_FreeType(&library); /* initialize library */
     if (error) {
-        std::cout << "Error: FT_Init_FreeType() failed with error " << error << std::endl;
+        logger.ERROR() << "FT_Init_FreeType() failed with error " << error << std::endl;
         exit(1);
     }
 
     error = FT_New_Face(library, opts.font_path.c_str(), 0, &face); /* create face object */
     if (error) {
-        std::cout << "Error: FT_New_Face() failed with error " << error << std::endl;
+        logger.ERROR() << "FT_New_Face() failed with error " << error << std::endl;
         exit(1);
     }
 
@@ -109,14 +116,14 @@ int main(int ac, char* av[])
 
     error = FT_Set_Char_Size(face, ptsize << 6, 0, int(round(dpi)), 0); /* set char size */
     if (error) {
-        std::cout << "Error: FT_Set_Char_Size() failed with error " << error << std::endl;
+        logger.ERROR() << "FT_Set_Char_Size() failed with error " << error << std::endl;
         exit(1);
     }
     slot = face->glyph;
     /* load glyph image into the slot (erase previous one) */
     error = FT_Load_Char(face, opts.ref_char[0], FT_LOAD_RENDER);
     if (error) {
-        std::cout << "Error: FT_Load_Char() failed with error " << error << std::endl;
+        logger.ERROR() << "FT_Load_Char() failed with error " << error << std::endl;
         exit(1);
     }
 
@@ -143,16 +150,16 @@ int main(int ac, char* av[])
     int scaledup_dpi = int(round(dpi * ttf_to_lead_scaleup));
     int typetop_to_baseline_px = int(round( upscaled_ascender_px +(opts.above_ref_char.as_inch() * dpi) ) );
 
-    printf("Glyph height in lead (mm): %f\r\n", lead_glyph_height.as_mm());
-    printf("Glyph height in TrueType (mm): %f\r\n", truetype_glyph_height.as_mm());
-    printf("dpi scaled up for lead-size glyph: %d\r\n", scaledup_dpi);
-    printf("typetop_to_baseline_px: %d\r\n", typetop_to_baseline_px);
+    logger.INFO() << "Glyph height in lead (mm): " << lead_glyph_height.as_mm() << std::endl;
+    logger.INFO() << "Glyph height in TrueType (mm): " << truetype_glyph_height.as_mm() << std::endl;
+    logger.INFO() << "dpi scaled up for lead-size glyph: " << scaledup_dpi << std::endl;
+    logger.INFO() << "typetop_to_baseline_px: " << typetop_to_baseline_px << std::endl;
 
 
         // scaled up Glyph load
     error = FT_Set_Char_Size(face, ptsize << 6, 0, scaledup_dpi, 0); /* set char size */
     if (error) {
-        std::cout << "Error: FT_Set_Char_Size() failed with error " << error << std::endl;
+        logger.ERROR() << "FT_Set_Char_Size() failed with error " << error << std::endl;
         exit(1);
     }
 
@@ -165,7 +172,7 @@ int main(int ac, char* av[])
         uint32_t current_char = opts.characters[i];
         error = FT_Load_Char(face, current_char, FT_LOAD_RENDER);
         if (error) {
-            std::cout << "Error: FT_Load_Char() failed with error " << error << std::endl;
+            logger.ERROR() << "FT_Load_Char() failed with error " << error << std::endl;
             exit(1);
         }
         // glyph size
@@ -258,7 +265,7 @@ int parse_options(int ac, char* av[])
         bpo::notify(vm);
 
         if (vm.count("help")) {
-            cout << desc << "\n";
+            logger.PRINT() << desc << "\n";
             exit(0);
         }
 
@@ -322,7 +329,7 @@ int parse_options(int ac, char* av[])
             if (chars["unicode"]) {
                 for(int i=0; i<  chars["unicode"].size(); i++) {
                     uint32_t unicode = chars["unicode"][i].as<unsigned int>();
-                    std::cout << "Unicode in config: " << unicode << std::endl;
+                    logger.INFO() << "Unicode in config: " << unicode << std::endl;
                     opts.characters.push_back(unicode);
                 }
             }
@@ -334,7 +341,7 @@ int parse_options(int ac, char* av[])
 
     }
     catch(exception& e) {
-        cerr << "error: " << e.what() << "\n";
+        logger.ERROR() << e.what() << "\n";
         return 1;
     }
     return 0;

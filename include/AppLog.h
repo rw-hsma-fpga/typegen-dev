@@ -15,6 +15,7 @@ public:
     // streambufs.
     teebuf();
     void connect(std::streambuf * sbuf1, std::streambuf * sbuf2);
+    void connect(std::streambuf * sbuf1);
 private:
     // This tee buffer has no buffer. So every character "overflows"
     // and can be put directly into the teed buffers.
@@ -36,6 +37,7 @@ public:
     // ostreams.
     teestream();
     void connect(std::ostream & o1, std::ostream & o2);
+    void connect(std::ostream & o1);
 private:
     teebuf tbuf;
 };
@@ -60,7 +62,6 @@ class AppLog {
     int stream_id;
     std::string filename;
     std::ofstream log_stream;
-    std::ofstream nullstream;
     teestream print;
     teestream info;
     teestream warning;
