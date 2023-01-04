@@ -757,6 +757,7 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         FXY = int32_t( round( foot.XY.as_mm()/RS  ) );
     }
 
+    int32_t PFH = int32_t( round( (UVstretchZ*(foot.pyramid_foot_height.as_mm()))/LH ) );
 
     if (find_rectangles() <0)
         return -1;
@@ -1347,10 +1348,10 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         float support_interval = ((body_size-2*side_support_width)/support_intervals);
         float interval_gap = support_interval - (2 * hollow_triangle_width);
         float triangle_support_gap = hollow_triangle_width - half_support_width;
-        logger.INFO() << "#support intervals: " << support_intervals << std::endl
-                  << "      #support intervals(mm): " << support_interval << std::endl
-                  << "      #intervals gap(mm): " << interval_gap << std::endl
-                  << "      triangle_support_gap(mm): " << triangle_support_gap << std::endl;
+//        logger.INFO() << "#support intervals: " << support_intervals << std::endl
+//                  << "      #support intervals(mm): " << support_interval << std::endl
+//                  << "      #intervals gap(mm): " << interval_gap << std::endl
+//                  << "      triangle_support_gap(mm): " << triangle_support_gap << std::endl;
 
         // stretch + discretize
         int32_t SI  = round((support_interval*UVstretchXY) / raster_size.as_mm());
@@ -1653,6 +1654,20 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         push_triangles(Zn, ltl, lbl, ltr, lbr); //lower face
     }
 
+    // PREPARE PYRAMID SUPPORTS + FOOT(?) + LOWER STRIP(?)
+
+        // DONE ABOVE: float body_size = (BS * raster_size.as_mm()) / UVstretchXY;
+        int32_t pyramid_count_X = int(round(body_size/(foot.pyramid_pitch.as_mm()))); // TODO: StretchXY?
+        float final_pyramid_pitch_X = body_size / pyramid_count_X; // TODO: StretchXY?
+
+        float set_width = (w * raster_size.as_mm()) / UVstretchXY;
+        int32_t pyramid_count_Y = int(round(set_width/(foot.pyramid_pitch.as_mm()))); // TODO: StretchXY?
+        float final_pyramid_pitch_Y = set_width / pyramid_count_Y; // TODO: StretchXY?
+
+        logger.PRINT() << "pyramid_count_X: " << pyramid_count_X << std::endl;
+        logger.PRINT() << "final_pyramid_pitch_X: " << final_pyramid_pitch_X << std::endl;
+        logger.PRINT() << "pyramid_count_Y: " << pyramid_count_Y << std::endl;
+        logger.PRINT() << "final_pyramid_pitch_Y: " << final_pyramid_pitch_Y << std::endl;
 
 
     // REDUCED FOOT (if exists)
@@ -1753,11 +1768,15 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         push_triangles(Zn, ltr, lbl, ltl, lbr);    
     }
     else if (foot.mode == supports) {
-        // Done in supports section above
+        // Done in supports section above?
     }
     else if (foot.mode == pyramids) {
         // lower by pyramid foot height
-    }
+        ltl = (intvec3d_t){0,  0, -(BH+PFH)};
+        ltr = (intvec3d_t){w,  0, -(BH+PFH)};
+        lbl = (intvec3d_t){0, -h, -(BH+PFH)};
+        lbr = (intvec3d_t){w, -h, -(BH+PFH)};
+        push_triangles(Zn, ltr, lbl, ltl, lbr);      }
     else { // no reduced foot
         ltl = (intvec3d_t){0,  0, -BH};
         ltr = (intvec3d_t){w,  0, -BH};
