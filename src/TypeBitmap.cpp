@@ -777,6 +777,7 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
     intvec3d_t Zp = (intvec3d_t){ 0,  0,  1};  intvec3d_t Zn = (intvec3d_t){ 0,  0, -1};
 
 
+
     // cube corners: upper/lower;top/botton;left/right
     intvec3d_t utl, utr, ubl, ubr, ltl, ltr, lbl, lbr;
 
@@ -1657,19 +1658,83 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
     // PREPARE PYRAMID SUPPORTS + FOOT(?) + LOWER STRIP(?)
 
         // DONE ABOVE: float body_size = (BS * raster_size.as_mm()) / UVstretchXY;
-        int32_t pyramid_count_X = int(round(body_size/(foot.pyramid_pitch.as_mm()))); // TODO: StretchXY?
-        float final_pyramid_pitch_X = body_size / pyramid_count_X; // TODO: StretchXY?
+        int32_t SW = w;
+        float set_width = (SW * raster_size.as_mm()) / UVstretchXY; // TODO: check stretch divide?
 
-        float set_width = (w * raster_size.as_mm()) / UVstretchXY;
-        int32_t pyramid_count_Y = int(round(set_width/(foot.pyramid_pitch.as_mm()))); // TODO: StretchXY?
-        float final_pyramid_pitch_Y = set_width / pyramid_count_Y; // TODO: StretchXY?
+        int32_t pyramid_count_Y = int(round(body_size/(foot.pyramid_pitch.as_mm()))); // TODO: StretchXY?
+        float final_pyramid_pitch_Y = body_size / pyramid_count_Y; // TODO: StretchXY?
 
-        logger.PRINT() << "pyramid_count_X: " << pyramid_count_X << std::endl;
-        logger.PRINT() << "final_pyramid_pitch_X: " << final_pyramid_pitch_X << std::endl;
+        int32_t pyramid_count_X = int(round(set_width/(foot.pyramid_pitch.as_mm()))); // TODO: StretchXY?
+        float final_pyramid_pitch_X = set_width / pyramid_count_X; // TODO: StretchXY?
+
         logger.PRINT() << "pyramid_count_Y: " << pyramid_count_Y << std::endl;
         logger.PRINT() << "final_pyramid_pitch_Y: " << final_pyramid_pitch_Y << std::endl;
 
+        logger.PRINT() << "pyramid_count_X: " << pyramid_count_X << std::endl;
+        logger.PRINT() << "final_pyramid_pitch_X: " << final_pyramid_pitch_X << std::endl;
 
+        std::vector<int32_t> pyramid_base_Y_points;
+        std::vector<int32_t> pyramid_top_Y_points;
+
+        std::vector<int32_t> pyramid_base_X_points;
+        std::vector<int32_t> pyramid_top_X_points;
+
+        for (i=0; i<pyramid_count_Y; i++) {
+            int32_t stepY = int(round(i*final_pyramid_pitch_Y*UVstretchXY/raster_size.as_mm()));
+            pyramid_base_Y_points.push_back(stepY);
+        }
+        pyramid_base_Y_points.push_back(BS);
+
+        for (i=0; i<pyramid_count_X; i++) {
+            int32_t stepX = int(round(i*final_pyramid_pitch_X*UVstretchXY/raster_size.as_mm()));
+            pyramid_base_X_points.push_back(stepX);
+        }
+        pyramid_base_X_points.push_back(SW);
+
+        for (i=0; i<pyramid_count_Y; i++) {
+            float firstY = (((float)i+0.5)*final_pyramid_pitch_Y)-(foot.pyramid_top_length.as_mm()/2);
+            pyramid_top_Y_points.push_back(int(round((firstY)*UVstretchXY/raster_size.as_mm())));
+            float secondY = (((float)i+0.5)*final_pyramid_pitch_Y)+(foot.pyramid_top_length.as_mm()/2);
+            pyramid_top_Y_points.push_back(int(round((secondY)*UVstretchXY/raster_size.as_mm())));
+        }
+        //pyramid_top_Y_points.push_back(BS);
+
+        for (i=0; i<pyramid_count_X; i++) {
+            float firstX = (((float)i+0.5)*final_pyramid_pitch_X)-(foot.pyramid_top_length.as_mm()/2);
+            pyramid_top_X_points.push_back(int(round((firstX)*UVstretchXY/raster_size.as_mm())));
+            float secondX = (((float)i+0.5)*final_pyramid_pitch_X)+(foot.pyramid_top_length.as_mm()/2);
+            pyramid_top_X_points.push_back(int(round((secondX)*UVstretchXY/raster_size.as_mm())));
+        }
+        //pyramid_top_X_points.push_back(BS);
+
+        int32_t PH = int(round((final_pyramid_pitch_Y-foot.pyramid_top_length.as_mm())*0.5*UVstretchZ / layer_height.as_mm()));
+
+        triangles.clear();
+
+        for (i=0; i<pyramid_count_Y; i++) {
+            for (j=0; j<pyramid_count_X; j++) {
+
+                utl = (intvec3d_t){pyramid_top_X_points[j*2], -pyramid_top_Y_points[i*2], -BH};
+                utr = (intvec3d_t){pyramid_top_X_points[j*2], -pyramid_top_Y_points[i*2+1], -BH};
+                ubl = (intvec3d_t){pyramid_top_X_points[j*2+1], -pyramid_top_Y_points[i*2], -BH};
+                ubr = (intvec3d_t){pyramid_top_X_points[j*2+1], -pyramid_top_Y_points[i*2+1], -BH};
+
+                ltl = (intvec3d_t){pyramid_base_X_points[j], -pyramid_base_Y_points[i], -(BH+PH)};
+                ltr = (intvec3d_t){pyramid_base_X_points[j], -pyramid_base_Y_points[i+1], -(BH+PH)};
+                lbl = (intvec3d_t){pyramid_base_X_points[j+1], -pyramid_base_Y_points[i], -(BH+PH)};
+                lbr = (intvec3d_t){pyramid_base_X_points[j+1], -pyramid_base_Y_points[i+1], -(BH+PH)};
+
+                // TODO Better normals!!!
+                intvec3d_t XpZp = (intvec3d_t){ 1,  0,  1};  intvec3d_t XnZp = (intvec3d_t){-1,  0,  1};
+                intvec3d_t YpZp = (intvec3d_t){ 0,  1,  1};  intvec3d_t YnZp = (intvec3d_t){0, -1,  1};
+
+                push_triangles(XnZp, ubl, utl, ltl, lbl); // left face
+                push_triangles(XpZp, ubr, ltr, utr, lbr); // right face
+                push_triangles(YnZp, utl, utr, ltr, ltl); // top face
+                push_triangles(YpZp, ubl, lbr, ubr, lbl); // bottom face
+
+            }
+        }
     // REDUCED FOOT (if exists)
 
     if (foot.mode == step) { // stepped foot
@@ -1776,7 +1841,8 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         ltr = (intvec3d_t){w,  0, -(BH+PFH)};
         lbl = (intvec3d_t){0, -h, -(BH+PFH)};
         lbr = (intvec3d_t){w, -h, -(BH+PFH)};
-        push_triangles(Zn, ltr, lbl, ltl, lbr);      }
+        push_triangles(Zn, ltr, lbl, ltl, lbr);
+    }
     else { // no reduced foot
         ltl = (intvec3d_t){0,  0, -BH};
         ltr = (intvec3d_t){w,  0, -BH};
