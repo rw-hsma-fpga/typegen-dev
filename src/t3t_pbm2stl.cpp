@@ -374,6 +374,12 @@ int parse_options(int ac, char* av[])
                 get_yaml_dim_node(config, "pyramid foot height", opts.foot.pyramid_foot_height);
             else
                 opts.foot.pyramid_foot_height.set(0,mm);
+
+            if (config["pyramid height factor"])
+                opts.foot.pyramid_height_factor = config["pyramid height factor"].as<float>();
+            else
+                opts.foot.pyramid_height_factor = 1.0;
+
         }
 
         // TODO: SANITY CHECK FOR TYPE HEIGHT

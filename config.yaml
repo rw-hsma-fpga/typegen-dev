@@ -28,3 +28,5 @@ pyramid top length:
 pyramid foot height:
   value: 2.0
   unit: mm
+
+pyramid height factor: 2.0

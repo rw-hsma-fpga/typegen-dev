@@ -19,6 +19,7 @@ struct reduced_foot {
     dim_t pyramid_pitch; // X/Y pitch for pyramids to be approximated
     dim_t pyramid_top_length; // length of a side of cut-off pyramid
     dim_t pyramid_foot_height; // Height of extra foot including pyramids
+    float pyramid_height_factor; // pyramid height in relation to width/pitch
 
     // constructor
     reduced_foot() { mode = no_foot; };
