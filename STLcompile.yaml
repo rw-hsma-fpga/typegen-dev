@@ -1,12 +1,12 @@
 # all in mm
 platform size X: 200.0
 platform size Y: 100.0
-gap X: 3.5
-gap Y: 4.0
+gap X: 6
+gap Y: 8
 
 
 working directory:
-  path: ./ttc24_big_supports/
+  path: ./ttc48_pyramids/
   create: false # ignored by STLcompiler for now
 
 
@@ -14,29 +14,6 @@ working directory:
 
 # rows
 structure:
-  - A A A A A A sp C C sp D D D D D D
-  - E E E E E E E sp F F F sp sp G G G G
-  - I I I I I I sp L L sp N N N N N N N N
-  - O O O O O sp S S S S S S S S S S .
-  - T T T T T T T sp U U U U sp W W W 
-  - P P sp B sp R R R R R sp sp B . H H H .
-
-
-
-
-#  - A B C D E F G H I L N S
-#  - O R S T U W A B C D E
-#  - F G H I L N O R S T U
-#  - A D E F G H I N O R S .
-#  - T U W A D E G I N O R
-#  - T U W D E I N O R S T .
-#  - E N S T E N S T S W S
-
-
-#  - A A A A B B C C D D D D D
-#  - E E E E E E E F F F G G G G H H H
-#  - I I I I I L L N N N N N N N
-#  - O O O O O S S S S S S S S S R R R R R
-#  - T T T T T T T U U U U W W W W 
-
-
+  - A E F H
+  - L M N S
+  - T U W Y

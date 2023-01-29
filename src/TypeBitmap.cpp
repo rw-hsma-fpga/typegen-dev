@@ -1334,6 +1334,44 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
 
 
 
+    if (foot.mode != pyramids) {
+
+        // LOWER BODY STRIP (above reduced foot, if exists)  TODO - make different one for supports-foot
+        utl = (intvec3d_t){0,  0, -BLC};
+        utr = (intvec3d_t){w,  0, -BLC};
+        ubl = (intvec3d_t){0, -h, -BLC};
+        ubr = (intvec3d_t){w, -h, -BLC};
+        ltl = (intvec3d_t){0,  0, -(BH-FZ)};
+        ltr = (intvec3d_t){w,  0, -(BH-FZ)};
+        lbl = (intvec3d_t){0, -h, -(BH-FZ)};
+        lbr = (intvec3d_t){w, -h, -(BH-FZ)};
+
+
+    }
+
+    if ((foot.mode != supports) && (foot.mode != pyramids)) { // all other feet, not pyramids, not supports
+
+        // TODO: find out where these corners were defined
+        push_triangles(Xn, ubl, utl, ltl, lbl); // left face
+        push_triangles(Xp, ubr, ltr, utr, lbr); // right face
+
+        // LOWER BODY STRIP (above reduced foot, if exists)  TODO - make different one for supports-foot
+        utl = (intvec3d_t){0,  0, -BLC};
+        utr = (intvec3d_t){w,  0, -BLC};
+        ubl = (intvec3d_t){0, -h, -BLC};
+        ubr = (intvec3d_t){w, -h, -BLC};
+        ltl = (intvec3d_t){0,  0, -(BH-FZ)};
+        ltr = (intvec3d_t){w,  0, -(BH-FZ)};
+        lbl = (intvec3d_t){0, -h, -(BH-FZ)};
+        lbr = (intvec3d_t){w, -h, -(BH-FZ)};
+
+        push_triangles(Yp, utl, utr, ltr, ltl); // top face
+        push_triangles(Yn, ubl, lbr, ubr, lbl); // bottom face
+    }
+
+
+
+
     // PREPARE SUPPORTS + FOOT + LOWER STRIP
     // TODO Lots of constants - consider what should be configurable?
 
@@ -1341,15 +1379,15 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         int32_t BS = bm_height;
         float body_size = (BS * raster_size.as_mm()) / UVstretchXY;
         const float side_support_width = 0.25; // mm
-        const float half_support_width = 0.75; // mm    
-        const float min_support_interval = 4.0; // mm
+        const float half_support_width = 0.75; // mm
+        const float min_support_intervalY = 4.0; // mm
         const float hollow_triangle_width = 1.25; // mm
         // unstretched calculations
-        int32_t support_intervals = int((body_size-2*side_support_width)/min_support_interval); // rounded down
-        float support_interval = ((body_size-2*side_support_width)/support_intervals);
+        int32_t support_intervalsY = int((body_size-2*side_support_width)/min_support_intervalY); // rounded down
+        float support_interval = ((body_size-2*side_support_width)/support_intervalsY);
         float interval_gap = support_interval - (2 * hollow_triangle_width);
         float triangle_support_gap = hollow_triangle_width - half_support_width;
-//        logger.INFO() << "#support intervals: " << support_intervals << std::endl
+//        logger.INFO() << "#support intervals: " << support_intervalsY << std::endl
 //                  << "      #support intervals(mm): " << support_interval << std::endl
 //                  << "      #intervals gap(mm): " << interval_gap << std::endl
 //                  << "      triangle_support_gap(mm): " << triangle_support_gap << std::endl;
@@ -1379,6 +1417,34 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         int32_t FH4 = FH3-SGH;
         int32_t FH5 = FH4-SBH;
 
+        // X-direction dimensions
+        int32_t SW = bm_width;
+        const float x_support_gap = 1.0; // mm
+        const float min_support_intervalX = 5.0; // mm - includes gap (half on each side of gap)??
+        float set_width_size = (SW * raster_size.as_mm()) / UVstretchXY;
+        int32_t support_intervalsX = int(set_width_size/min_support_intervalX); // rounded down
+        if (support_intervalsX < 1)
+            support_intervalsX = 1;
+        float support_widthX = (set_width_size - ((support_intervalsX-1)*x_support_gap)) / support_intervalsX;
+
+        std::vector<int32_t> support_segments_x1;
+        std::vector<int32_t> support_segments_x2;
+
+        for (int i=0; i<support_intervalsX; i++) {
+
+            float f_x1 = i * (x_support_gap + support_widthX);
+            float f_x2 = f_x1 + support_widthX;
+
+            int32_t x1 = round((f_x1 * UVstretchXY)/ raster_size.as_mm());
+            int32_t x2 = round((f_x2 * UVstretchXY)/ raster_size.as_mm());
+
+            support_segments_x1.push_back(x1);
+            support_segments_x2.push_back(x2);
+        }
+        // fix rounding errors
+        support_segments_x1[0] = 0;
+        support_segments_x2[support_intervalsX-1] = SW;
+
     // generate mesh connection points to support foot structure
     std::vector<int32_t> support_foot_verticesY;
 
@@ -1388,7 +1454,7 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
     support_foot_verticesY.push_back(Ycnt);
 
     // interval segments of triangle gap layer
-    for (int i=0; i< support_intervals; i++) {
+    for (int i=0; i< support_intervalsY; i++) {
 
         support_foot_verticesY.push_back(Ycnt);
         support_foot_verticesY.push_back(Ycnt+HTW);
@@ -1399,24 +1465,9 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
     }
     support_foot_verticesY.push_back(BS);
 
-    if (foot.mode != pyramids) {
-
-        // LOWER BODY STRIP (above reduced foot, if exists)  TODO - make different one for supports-foot
-        utl = (intvec3d_t){0,  0, -BLC};
-        utr = (intvec3d_t){w,  0, -BLC};
-        ubl = (intvec3d_t){0, -h, -BLC};
-        ubr = (intvec3d_t){w, -h, -BLC};
-        ltl = (intvec3d_t){0,  0, -(BH-FZ)};
-        ltr = (intvec3d_t){w,  0, -(BH-FZ)};
-        lbl = (intvec3d_t){0, -h, -(BH-FZ)};
-        lbr = (intvec3d_t){w, -h, -(BH-FZ)};
-
-        push_triangles(Yp, utl, utr, ltr, ltl); // top face
-        push_triangles(Yn, ubl, lbr, ubr, lbl); // bottom face
-
-    }
 
     if (foot.mode == supports) {
+
         //side center
         int32_t cz = -(BLC+(BH-FZ))/2;
         int32_t cy = -BS/2;
@@ -1449,238 +1500,291 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         push_triangles(Xp, utr, ltr, center_right);
         push_triangles(Xp, ubr, lbr, center_right);
 
-    }
-    else if (foot.mode != pyramids) { // all other feet
-        push_triangles(Xn, ubl, utl, ltl, lbl); // left face
-        push_triangles(Xp, ubr, ltr, utr, lbr); // right face
-    }
+
+        // Top/Bottom faces above supports
+        intvec3d_t top_center = {w/2, 0 , cz}; // TODO FIX z
+        intvec3d_t t1 = {0, 0, -(BH-FZ)};
+        intvec3d_t t2 = {0, 0, -(BH-FZ)};
+
+        intvec3d_t bottom_center = {w/2, -h , cz}; // TODO FIX z
+        intvec3d_t b1 = {0, -h, -(BH-FZ)};
+        intvec3d_t b2 = {0, -h, -(BH-FZ)};
+
+        std::vector<int32_t> all_supportX_points;
+        all_supportX_points = support_segments_x1;
+        for (int j=0; j<support_segments_x2.size(); j++)
+            all_supportX_points.push_back(support_segments_x2[j]);
+        std::sort(all_supportX_points.begin(),all_supportX_points.end());
+
+        for (int i=0; i< (all_supportX_points.size()-1); i++) {
+            t1.x = all_supportX_points[i];
+            t2.x = all_supportX_points[i+1];
+            push_triangles(Yp, t1, t2, top_center);
+            b1.x = all_supportX_points[i];
+            b2.x = all_supportX_points[i+1];
+            push_triangles(Yn, b1, b2, bottom_center);
+        }
+        push_triangles(Yp, utl, utr, top_center);
+        push_triangles(Yp, utl, ltl, top_center);
+        push_triangles(Yp, utr, ltr, top_center);
+        push_triangles(Yn, ubl, ubr, bottom_center);
+        push_triangles(Yn, ubl, lbl, bottom_center);
+        push_triangles(Yn, ubr, lbr, bottom_center);
 
 
+        // down-facing between split supports
+        for (int j=0; j<(support_intervalsX-1); j++) {
 
-    if (foot.mode == supports) { // layers in Y direction
+            int32_t left_edge = support_segments_x2[j];
+            int32_t right_edge = support_segments_x1[j+1];
 
-        int32_t TBC = 0; // top-to-buttom count
-        intvec3d_t YnZn = (intvec3d_t){ 0,  -1,  -1};
-        intvec3d_t YpZn = (intvec3d_t){ 0,   1,  -1};
+            intvec3d_t center = {(left_edge+right_edge)/2, -h/2 , -(BH-FZ)};
+            intvec3d_t l1 = {left_edge, 0, -(BH-FZ)};
+            intvec3d_t l2 = {left_edge, -h, -(BH-FZ)};
+            intvec3d_t r1 = {right_edge, 0, -(BH-FZ)};
+            intvec3d_t r2 = {right_edge, -h, -(BH-FZ)};
+            push_triangles(Zn, l1, r1, center);
+            push_triangles(Zn, l2, r2, center);
 
-        // top side support strip
-        utl = (intvec3d_t){0,  0, FH1}; utr = (intvec3d_t){w,  0, FH1};
-        ubl = (intvec3d_t){0, -SSW, FH1}; ubr = (intvec3d_t){w, -SSW, FH1};
-        ltl = (intvec3d_t){0,  0, FH2}; ltr = (intvec3d_t){w,  0, FH2};
-        lbl = (intvec3d_t){0, -SSW, FH2}; lbr = (intvec3d_t){w, -SSW, FH2};
-        push_triangles(Yp, utl, utr, ltl, ltr); //top
-        push_triangles(Xn, utl, ubl, ltl, lbl); //left
-        push_triangles(Xp, utr, ubr, ltr, lbr); //right
-        push_triangles(Yn, ubl, ubr, lbl, lbr); //bottom - facing hollow triangle
+            for (int i=0; i< (support_foot_verticesY.size()-1); i++) {
+                l1.y = -support_foot_verticesY[i];
+                l2.y = -support_foot_verticesY[i+1];
+                push_triangles(Zn, l1, l2, center);
+                r1.y = -support_foot_verticesY[i];
+                r2.y = -support_foot_verticesY[i+1];
+                push_triangles(Zn, r1, r2, center);
+            }
 
-        utl.z = FH2; ubl.z = FH2; utr.z = FH2; ubr.z = FH2;
-        ltl.z = FH3; lbl.z = FH3; ltr.z = FH3; lbr.z = FH3;
-        push_triangles(Yp, utl, utr, ltl, ltr); //top
-        push_triangles(Xn, utl, ubl, ltl, lbl); //left
-        push_triangles(Xp, utr, ubr, ltr, lbr); //right
+        }
 
-        utl.z = FH3; ubl.z = FH3; utr.z = FH3; ubr.z = FH3;
-        ltl.z = FH4; lbl.z = FH4; ltr.z = FH4; lbr.z = FH4;
-        push_triangles(Yp, utl, utr, ltl, ltr); //top
-        push_triangles(Xn, utl, ubl, ltl, lbl); //left
-        push_triangles(Xp, utr, ubr, ltr, lbr); //right
+        // layers in Y direction, X-segmented
+        for (int j=0; j<support_intervalsX; j++) {
 
-        utl.z = FH4; ubl.z = FH4; utr.z = FH4; ubr.z = FH4;
-        ltl.z = FH5; lbl.z = FH5; ltr.z = FH5; lbr.z = FH5;
-        push_triangles(Yp, utl, utr, ltl, ltr); //top
-        push_triangles(Xn, utl, ubl, ltl, lbl); //left
-        push_triangles(Xp, utr, ubr, ltr, lbr); //right
-        push_triangles(Zn, ltl, lbl, ltr, lbr); //lower face
+            int seg_x1 =  support_segments_x1[j];//(w/8)*(j*2);
+            int seg_x2 =  support_segments_x2[j];//(w/8)*(j*2+1);
 
-        TBC += SSW;
+            int32_t TBC = 0; // top-to-buttom count
+            intvec3d_t YnZn = (intvec3d_t){ 0,  -1,  -1};
+            intvec3d_t YpZn = (intvec3d_t){ 0,   1,  -1};
 
-        // interval segments
-        for (int i=0; i< support_intervals; i++) {
-
-            // triangle gap layer
-            int32_t FY1 = TBC;
-            int32_t FY2 = TBC+HTW;
-            int32_t FY3 = TBC+HTW+IG;
-            int32_t FY4 = TBC+HTW+IG+HTW;
-            int32_t FY5;
-            int32_t FY6;
-
-            utl = (intvec3d_t){0, -FY1, FH1}; utr = (intvec3d_t){w, -FY1, FH1};
-            ubl = (intvec3d_t){0, -FY2, FH1}; ubr = (intvec3d_t){w, -FY2, FH1};
-            ltl = (intvec3d_t){0, -FY1, FH2}; ltr = (intvec3d_t){w, -FY1, FH2};
-            lbl = (intvec3d_t){0, -FY2, FH2}; lbr = (intvec3d_t){w, -FY2, FH2};
-            push_triangles(Xn, utl, ubl, lbl); //left
-            push_triangles(Xp, utr, ubr, lbr); //right
-            push_triangles(YnZn, utl, utr, lbl, lbr); //diagonal downward face
-
-            utl = (intvec3d_t){0, -FY2, FH1}; utr = (intvec3d_t){w, -FY2, FH1};
-            ubl = (intvec3d_t){0, -FY3, FH1}; ubr = (intvec3d_t){w, -FY3, FH1};
-            ltl = (intvec3d_t){0, -FY2, FH2}; ltr = (intvec3d_t){w, -FY2, FH2};
-            lbl = (intvec3d_t){0, -FY3, FH2}; lbr = (intvec3d_t){w, -FY3, FH2};
+            // top side support strip
+            utl = (intvec3d_t){seg_x1,  0, FH1}; utr = (intvec3d_t){seg_x2,  0, FH1};
+            ubl = (intvec3d_t){seg_x1, -SSW, FH1}; ubr = (intvec3d_t){seg_x2, -SSW, FH1};
+            ltl = (intvec3d_t){seg_x1,  0, FH2}; ltr = (intvec3d_t){seg_x2,  0, FH2};
+            lbl = (intvec3d_t){seg_x1, -SSW, FH2}; lbr = (intvec3d_t){seg_x2, -SSW, FH2};
+            push_triangles(Yp, utl, utr, ltl, ltr); //top
             push_triangles(Xn, utl, ubl, ltl, lbl); //left
             push_triangles(Xp, utr, ubr, ltr, lbr); //right
+            push_triangles(Yn, ubl, ubr, lbl, lbr); //bottom - facing hollow triangle
 
-            utl = (intvec3d_t){0, -FY3, FH1}; utr = (intvec3d_t){w, -FY3, FH1};
-            ubl = (intvec3d_t){0, -FY4, FH1}; ubr = (intvec3d_t){w, -FY4, FH1};
-            ltl = (intvec3d_t){0, -FY3, FH2}; ltr = (intvec3d_t){w, -FY3, FH2};
-            lbl = (intvec3d_t){0, -FY4, FH2}; lbr = (intvec3d_t){w, -FY4, FH2};
-            push_triangles(Xn, utl, ubl, ltl); //left
-            push_triangles(Xp, utr, ubr, ltr); //right
-            push_triangles(YpZn, ubl, ubr, ltl, ltr); //diagonal downward face
-
-
-            // solid foot layer
-            FY1 = TBC;
-            FY2 = TBC+HSW;
-            FY3 = TBC+HSW+TSG;
-            FY4 = TBC+HSW+TSG+IG;
-            FY5 = TBC+HSW+TSG+IG+TSG;
-            FY6 = TBC+HSW+TSG+IG+TSG+HSW;
-
-            utl = (intvec3d_t){0, -FY1, FH2}; utr = (intvec3d_t){w, -FY1, FH2};
-            ubl = (intvec3d_t){0, -FY2, FH2}; ubr = (intvec3d_t){w, -FY2, FH2};
-            ltl = (intvec3d_t){0, -FY1, FH3}; ltr = (intvec3d_t){w, -FY1, FH3};
-            lbl = (intvec3d_t){0, -FY2, FH3}; lbr = (intvec3d_t){w, -FY2, FH3};
-            push_triangles(Zp, utl, ubl, utr, ubr); //upper face
-            push_triangles(Xn, utl, ubl, ltl, lbl); //left
-            push_triangles(Xp, utr, ubr, ltr, lbr); //right
-
-            utl = (intvec3d_t){0, -FY2, FH2}; utr = (intvec3d_t){w, -FY2, FH2};
-            ubl = (intvec3d_t){0, -FY3, FH2}; ubr = (intvec3d_t){w, -FY3, FH2};
-            ltl = (intvec3d_t){0, -FY2, FH3}; ltr = (intvec3d_t){w, -FY2, FH3};
-            lbl = (intvec3d_t){0, -FY3, FH3}; lbr = (intvec3d_t){w, -FY3, FH3};
-            push_triangles(Zp, utl, ubl, utr, ubr); //upper face
-            push_triangles(Xn, utl, ubl, ltl, lbl); //left
-            push_triangles(Xp, utr, ubr, ltr, lbr); //right
-            push_triangles(Zn, ltl, lbl, ltr, lbr); //lower face
-
-            utl = (intvec3d_t){0, -FY3, FH2}; utr = (intvec3d_t){w, -FY3, FH2};
-            ubl = (intvec3d_t){0, -FY4, FH2}; ubr = (intvec3d_t){w, -FY4, FH2};
-            ltl = (intvec3d_t){0, -FY3, FH3}; ltr = (intvec3d_t){w, -FY3, FH3};
-            lbl = (intvec3d_t){0, -FY4, FH3}; lbr = (intvec3d_t){w, -FY4, FH3};
-            push_triangles(Xn, utl, ubl, ltl, lbl); //left
-            push_triangles(Xp, utr, ubr, ltr, lbr); //right
-            push_triangles(Zn, ltl, lbl, ltr, lbr); //lower face
-
-            utl = (intvec3d_t){0, -FY4, FH2}; utr = (intvec3d_t){w, -FY4, FH2};
-            ubl = (intvec3d_t){0, -FY5, FH2}; ubr = (intvec3d_t){w, -FY5, FH2};
-            ltl = (intvec3d_t){0, -FY4, FH3}; ltr = (intvec3d_t){w, -FY4, FH3};
-            lbl = (intvec3d_t){0, -FY5, FH3}; lbr = (intvec3d_t){w, -FY5, FH3};
-            push_triangles(Zp, utl, ubl, utr, ubr); //upper face
-            push_triangles(Xn, utl, ubl, ltl, lbl); //left
-            push_triangles(Xp, utr, ubr, ltr, lbr); //right
-            push_triangles(Zn, ltl, lbl, ltr, lbr); //lower face
-
-            utl = (intvec3d_t){0, -FY5, FH2}; utr = (intvec3d_t){w, -FY5, FH2};
-            ubl = (intvec3d_t){0, -FY6, FH2}; ubr = (intvec3d_t){w, -FY6, FH2};
-            ltl = (intvec3d_t){0, -FY5, FH3}; ltr = (intvec3d_t){w, -FY5, FH3};
-            lbl = (intvec3d_t){0, -FY6, FH3}; lbr = (intvec3d_t){w, -FY6, FH3};
-            push_triangles(Zp, utl, ubl, utr, ubr); //upper face
-            push_triangles(Xn, utl, ubl, ltl, lbl); //left
-            push_triangles(Xp, utr, ubr, ltr, lbr); //right
-
-
-            // support gap strip
-            utl = (intvec3d_t){0, -FY1, FH3}; utr = (intvec3d_t){w, -FY1, FH3};
-            ubl = (intvec3d_t){0, -FY2, FH3}; ubr = (intvec3d_t){w, -FY2, FH3};
-            ltl = (intvec3d_t){0, -FY1, FH4}; ltr = (intvec3d_t){w, -FY1, FH4};
-            lbl = (intvec3d_t){0, -FY2, FH4}; lbr = (intvec3d_t){w, -FY2, FH4};
-            push_triangles(Xn, utl, ubl, ltl, lbl); //left
-            push_triangles(Xp, utr, ubr, ltr, lbr); //right
-            push_triangles(Yn, ubl, ubr, lbl, lbr); //bottom
-
-            utl = (intvec3d_t){0, -FY5, FH3}; utr = (intvec3d_t){w, -FY5, FH3};
-            ubl = (intvec3d_t){0, -FY6, FH3}; ubr = (intvec3d_t){w, -FY6, FH3};
-            ltl = (intvec3d_t){0, -FY5, FH4}; ltr = (intvec3d_t){w, -FY5, FH4};
-            lbl = (intvec3d_t){0, -FY6, FH4}; lbr = (intvec3d_t){w, -FY6, FH4};
+            utl.z = FH2; ubl.z = FH2; utr.z = FH2; ubr.z = FH2;
+            ltl.z = FH3; lbl.z = FH3; ltr.z = FH3; lbr.z = FH3;
             push_triangles(Yp, utl, utr, ltl, ltr); //top
             push_triangles(Xn, utl, ubl, ltl, lbl); //left
             push_triangles(Xp, utr, ubr, ltr, lbr); //right
 
+            utl.z = FH3; ubl.z = FH3; utr.z = FH3; ubr.z = FH3;
+            ltl.z = FH4; lbl.z = FH4; ltr.z = FH4; lbr.z = FH4;
+            push_triangles(Yp, utl, utr, ltl, ltr); //top
+            push_triangles(Xn, utl, ubl, ltl, lbl); //left
+            push_triangles(Xp, utr, ubr, ltr, lbr); //right
 
-            // solid base layer
-            utl = (intvec3d_t){0, -FY1, FH4}; utr = (intvec3d_t){w, -FY1, FH4};
-            ubl = (intvec3d_t){0, -FY2, FH4}; ubr = (intvec3d_t){w, -FY2, FH4};
-            ltl = (intvec3d_t){0, -FY1, FH5}; ltr = (intvec3d_t){w, -FY1, FH5};
-            lbl = (intvec3d_t){0, -FY2, FH5}; lbr = (intvec3d_t){w, -FY2, FH5};
+            utl.z = FH4; ubl.z = FH4; utr.z = FH4; ubr.z = FH4;
+            ltl.z = FH5; lbl.z = FH5; ltr.z = FH5; lbr.z = FH5;
+            push_triangles(Yp, utl, utr, ltl, ltr); //top
             push_triangles(Xn, utl, ubl, ltl, lbl); //left
             push_triangles(Xp, utr, ubr, ltr, lbr); //right
             push_triangles(Zn, ltl, lbl, ltr, lbr); //lower face
 
-            utl = (intvec3d_t){0, -FY2, FH4}; utr = (intvec3d_t){w, -FY2, FH4};
-            ubl = (intvec3d_t){0, -FY5, FH4}; ubr = (intvec3d_t){w, -FY5, FH4};
-            ltl = (intvec3d_t){0, -FY2, FH5}; ltr = (intvec3d_t){w, -FY2, FH5};
-            lbl = (intvec3d_t){0, -FY5, FH5}; lbr = (intvec3d_t){w, -FY5, FH5};
-            push_triangles(Zp, utl, ubl, utr, ubr); //upper face
+            TBC += SSW;
+
+            // Y-interval segments
+            for (int i=0; i< support_intervalsY; i++) {
+
+                // triangle gap layer
+                int32_t FY1 = TBC;
+                int32_t FY2 = TBC+HTW;
+                int32_t FY3 = TBC+HTW+IG;
+                int32_t FY4 = TBC+HTW+IG+HTW;
+                int32_t FY5;
+                int32_t FY6;
+
+                utl = (intvec3d_t){seg_x1, -FY1, FH1}; utr = (intvec3d_t){seg_x2, -FY1, FH1};
+                ubl = (intvec3d_t){seg_x1, -FY2, FH1}; ubr = (intvec3d_t){seg_x2, -FY2, FH1};
+                ltl = (intvec3d_t){seg_x1, -FY1, FH2}; ltr = (intvec3d_t){seg_x2, -FY1, FH2};
+                lbl = (intvec3d_t){seg_x1, -FY2, FH2}; lbr = (intvec3d_t){seg_x2, -FY2, FH2};
+                push_triangles(Xn, utl, ubl, lbl); //left
+                push_triangles(Xp, utr, ubr, lbr); //right
+                push_triangles(YnZn, utl, utr, lbl, lbr); //diagonal downward face
+
+                utl = (intvec3d_t){seg_x1, -FY2, FH1}; utr = (intvec3d_t){seg_x2, -FY2, FH1};
+                ubl = (intvec3d_t){seg_x1, -FY3, FH1}; ubr = (intvec3d_t){seg_x2, -FY3, FH1};
+                ltl = (intvec3d_t){seg_x1, -FY2, FH2}; ltr = (intvec3d_t){seg_x2, -FY2, FH2};
+                lbl = (intvec3d_t){seg_x1, -FY3, FH2}; lbr = (intvec3d_t){seg_x2, -FY3, FH2};
+                push_triangles(Xn, utl, ubl, ltl, lbl); //left
+                push_triangles(Xp, utr, ubr, ltr, lbr); //right
+
+                utl = (intvec3d_t){seg_x1, -FY3, FH1}; utr = (intvec3d_t){seg_x2, -FY3, FH1};
+                ubl = (intvec3d_t){seg_x1, -FY4, FH1}; ubr = (intvec3d_t){seg_x2, -FY4, FH1};
+                ltl = (intvec3d_t){seg_x1, -FY3, FH2}; ltr = (intvec3d_t){seg_x2, -FY3, FH2};
+                lbl = (intvec3d_t){seg_x1, -FY4, FH2}; lbr = (intvec3d_t){seg_x2, -FY4, FH2};
+                push_triangles(Xn, utl, ubl, ltl); //left
+                push_triangles(Xp, utr, ubr, ltr); //right
+                push_triangles(YpZn, ubl, ubr, ltl, ltr); //diagonal downward face
+
+
+                // solid foot layer
+                FY1 = TBC;
+                FY2 = TBC+HSW;
+                FY3 = TBC+HSW+TSG;
+                FY4 = TBC+HSW+TSG+IG;
+                FY5 = TBC+HSW+TSG+IG+TSG;
+                FY6 = TBC+HSW+TSG+IG+TSG+HSW;
+
+                utl = (intvec3d_t){seg_x1, -FY1, FH2}; utr = (intvec3d_t){seg_x2, -FY1, FH2};
+                ubl = (intvec3d_t){seg_x1, -FY2, FH2}; ubr = (intvec3d_t){seg_x2, -FY2, FH2};
+                ltl = (intvec3d_t){seg_x1, -FY1, FH3}; ltr = (intvec3d_t){seg_x2, -FY1, FH3};
+                lbl = (intvec3d_t){seg_x1, -FY2, FH3}; lbr = (intvec3d_t){seg_x2, -FY2, FH3};
+                push_triangles(Zp, utl, ubl, utr, ubr); //upper face
+                push_triangles(Xn, utl, ubl, ltl, lbl); //left
+                push_triangles(Xp, utr, ubr, ltr, lbr); //right
+
+                utl = (intvec3d_t){seg_x1, -FY2, FH2}; utr = (intvec3d_t){seg_x2, -FY2, FH2};
+                ubl = (intvec3d_t){seg_x1, -FY3, FH2}; ubr = (intvec3d_t){seg_x2, -FY3, FH2};
+                ltl = (intvec3d_t){seg_x1, -FY2, FH3}; ltr = (intvec3d_t){seg_x2, -FY2, FH3};
+                lbl = (intvec3d_t){seg_x1, -FY3, FH3}; lbr = (intvec3d_t){seg_x2, -FY3, FH3};
+                push_triangles(Zp, utl, ubl, utr, ubr); //upper face
+                push_triangles(Xn, utl, ubl, ltl, lbl); //left
+                push_triangles(Xp, utr, ubr, ltr, lbr); //right
+                push_triangles(Zn, ltl, lbl, ltr, lbr); //lower face
+
+                utl = (intvec3d_t){seg_x1, -FY3, FH2}; utr = (intvec3d_t){seg_x2, -FY3, FH2};
+                ubl = (intvec3d_t){seg_x1, -FY4, FH2}; ubr = (intvec3d_t){seg_x2, -FY4, FH2};
+                ltl = (intvec3d_t){seg_x1, -FY3, FH3}; ltr = (intvec3d_t){seg_x2, -FY3, FH3};
+                lbl = (intvec3d_t){seg_x1, -FY4, FH3}; lbr = (intvec3d_t){seg_x2, -FY4, FH3};
+                push_triangles(Xn, utl, ubl, ltl, lbl); //left
+                push_triangles(Xp, utr, ubr, ltr, lbr); //right
+                push_triangles(Zn, ltl, lbl, ltr, lbr); //lower face
+
+                utl = (intvec3d_t){seg_x1, -FY4, FH2}; utr = (intvec3d_t){seg_x2, -FY4, FH2};
+                ubl = (intvec3d_t){seg_x1, -FY5, FH2}; ubr = (intvec3d_t){seg_x2, -FY5, FH2};
+                ltl = (intvec3d_t){seg_x1, -FY4, FH3}; ltr = (intvec3d_t){seg_x2, -FY4, FH3};
+                lbl = (intvec3d_t){seg_x1, -FY5, FH3}; lbr = (intvec3d_t){seg_x2, -FY5, FH3};
+                push_triangles(Zp, utl, ubl, utr, ubr); //upper face
+                push_triangles(Xn, utl, ubl, ltl, lbl); //left
+                push_triangles(Xp, utr, ubr, ltr, lbr); //right
+                push_triangles(Zn, ltl, lbl, ltr, lbr); //lower face
+
+                utl = (intvec3d_t){seg_x1, -FY5, FH2}; utr = (intvec3d_t){seg_x2, -FY5, FH2};
+                ubl = (intvec3d_t){seg_x1, -FY6, FH2}; ubr = (intvec3d_t){seg_x2, -FY6, FH2};
+                ltl = (intvec3d_t){seg_x1, -FY5, FH3}; ltr = (intvec3d_t){seg_x2, -FY5, FH3};
+                lbl = (intvec3d_t){seg_x1, -FY6, FH3}; lbr = (intvec3d_t){seg_x2, -FY6, FH3};
+                push_triangles(Zp, utl, ubl, utr, ubr); //upper face
+                push_triangles(Xn, utl, ubl, ltl, lbl); //left
+                push_triangles(Xp, utr, ubr, ltr, lbr); //right
+
+
+                // support gap strip
+                utl = (intvec3d_t){seg_x1, -FY1, FH3}; utr = (intvec3d_t){seg_x2, -FY1, FH3};
+                ubl = (intvec3d_t){seg_x1, -FY2, FH3}; ubr = (intvec3d_t){seg_x2, -FY2, FH3};
+                ltl = (intvec3d_t){seg_x1, -FY1, FH4}; ltr = (intvec3d_t){seg_x2, -FY1, FH4};
+                lbl = (intvec3d_t){seg_x1, -FY2, FH4}; lbr = (intvec3d_t){seg_x2, -FY2, FH4};
+                push_triangles(Xn, utl, ubl, ltl, lbl); //left
+                push_triangles(Xp, utr, ubr, ltr, lbr); //right
+                push_triangles(Yn, ubl, ubr, lbl, lbr); //bottom
+
+                utl = (intvec3d_t){seg_x1, -FY5, FH3}; utr = (intvec3d_t){seg_x2, -FY5, FH3};
+                ubl = (intvec3d_t){seg_x1, -FY6, FH3}; ubr = (intvec3d_t){seg_x2, -FY6, FH3};
+                ltl = (intvec3d_t){seg_x1, -FY5, FH4}; ltr = (intvec3d_t){seg_x2, -FY5, FH4};
+                lbl = (intvec3d_t){seg_x1, -FY6, FH4}; lbr = (intvec3d_t){seg_x2, -FY6, FH4};
+                push_triangles(Yp, utl, utr, ltl, ltr); //top
+                push_triangles(Xn, utl, ubl, ltl, lbl); //left
+                push_triangles(Xp, utr, ubr, ltr, lbr); //right
+
+
+                // solid base layer
+                utl = (intvec3d_t){seg_x1, -FY1, FH4}; utr = (intvec3d_t){seg_x2, -FY1, FH4};
+                ubl = (intvec3d_t){seg_x1, -FY2, FH4}; ubr = (intvec3d_t){seg_x2, -FY2, FH4};
+                ltl = (intvec3d_t){seg_x1, -FY1, FH5}; ltr = (intvec3d_t){seg_x2, -FY1, FH5};
+                lbl = (intvec3d_t){seg_x1, -FY2, FH5}; lbr = (intvec3d_t){seg_x2, -FY2, FH5};
+                push_triangles(Xn, utl, ubl, ltl, lbl); //left
+                push_triangles(Xp, utr, ubr, ltr, lbr); //right
+                push_triangles(Zn, ltl, lbl, ltr, lbr); //lower face
+
+                utl = (intvec3d_t){seg_x1, -FY2, FH4}; utr = (intvec3d_t){seg_x2, -FY2, FH4};
+                ubl = (intvec3d_t){seg_x1, -FY5, FH4}; ubr = (intvec3d_t){seg_x2, -FY5, FH4};
+                ltl = (intvec3d_t){seg_x1, -FY2, FH5}; ltr = (intvec3d_t){seg_x2, -FY2, FH5};
+                lbl = (intvec3d_t){seg_x1, -FY5, FH5}; lbr = (intvec3d_t){seg_x2, -FY5, FH5};
+                push_triangles(Zp, utl, ubl, utr, ubr); //upper face
+                push_triangles(Xn, utl, ubl, ltl, lbl); //left
+                push_triangles(Xp, utr, ubr, ltr, lbr); //right
+                push_triangles(Zn, ltl, lbl, ltr, lbr); //lower face
+
+                utl = (intvec3d_t){seg_x1, -FY5, FH4}; utr = (intvec3d_t){seg_x2, -FY5, FH4};
+                ubl = (intvec3d_t){seg_x1, -FY6, FH4}; ubr = (intvec3d_t){seg_x2, -FY6, FH4};
+                ltl = (intvec3d_t){seg_x1, -FY5, FH5}; ltr = (intvec3d_t){seg_x2, -FY5, FH5};
+                lbl = (intvec3d_t){seg_x1, -FY6, FH5}; lbr = (intvec3d_t){seg_x2, -FY6, FH5};
+                push_triangles(Xn, utl, ubl, ltl, lbl); //left
+                push_triangles(Xp, utr, ubr, ltr, lbr); //right
+                push_triangles(Zn, ltl, lbl, ltr, lbr); //lower face
+
+
+                TBC += (HTW + IG + HTW);
+            }
+
+            // bottom side support strip
+            utl = (intvec3d_t){seg_x1,  -TBC, FH1}; utr = (intvec3d_t){seg_x2, -TBC, FH1};
+            ubl = (intvec3d_t){seg_x1, -BS, FH1}; ubr = (intvec3d_t){seg_x2, -BS, FH1};
+            ltl = (intvec3d_t){seg_x1,  -TBC, FH2}; ltr = (intvec3d_t){seg_x2, -TBC, FH2};
+            lbl = (intvec3d_t){seg_x1, -BS, FH2}; lbr = (intvec3d_t){seg_x2, -BS, FH2};
+            push_triangles(Yp, utl, utr, ltl, ltr); //top - facing hollow triangle
             push_triangles(Xn, utl, ubl, ltl, lbl); //left
             push_triangles(Xp, utr, ubr, ltr, lbr); //right
-            push_triangles(Zn, ltl, lbl, ltr, lbr); //lower face
+            push_triangles(Yn, ubl, ubr, lbl, lbr); //bottom
 
-            utl = (intvec3d_t){0, -FY5, FH4}; utr = (intvec3d_t){w, -FY5, FH4};
-            ubl = (intvec3d_t){0, -FY6, FH4}; ubr = (intvec3d_t){w, -FY6, FH4};
-            ltl = (intvec3d_t){0, -FY5, FH5}; ltr = (intvec3d_t){w, -FY5, FH5};
-            lbl = (intvec3d_t){0, -FY6, FH5}; lbr = (intvec3d_t){w, -FY6, FH5};
+            utl.z = FH2; ubl.z = FH2; utr.z = FH2; ubr.z = FH2;
+            ltl.z = FH3; lbl.z = FH3; ltr.z = FH3; lbr.z = FH3;
             push_triangles(Xn, utl, ubl, ltl, lbl); //left
             push_triangles(Xp, utr, ubr, ltr, lbr); //right
+            push_triangles(Yn, ubl, ubr, lbl, lbr); //bottom
+
+            utl.z = FH3; ubl.z = FH3; utr.z = FH3; ubr.z = FH3;
+            ltl.z = FH4; lbl.z = FH4; ltr.z = FH4; lbr.z = FH4;
+            push_triangles(Xn, utl, ubl, ltl, lbl); //left
+            push_triangles(Xp, utr, ubr, ltr, lbr); //right
+            push_triangles(Yn, ubl, ubr, lbl, lbr); //bottom
+
+            utl.z = FH4; ubl.z = FH4; utr.z = FH4; ubr.z = FH4;
+            ltl.z = FH5; lbl.z = FH5; ltr.z = FH5; lbr.z = FH5;
+            push_triangles(Xn, utl, ubl, ltl, lbl); //left
+            push_triangles(Xp, utr, ubr, ltr, lbr); //right
+            push_triangles(Yn, ubl, ubr, lbl, lbr); //bottom
             push_triangles(Zn, ltl, lbl, ltr, lbr); //lower face
-
-
-            TBC += (HTW + IG + HTW);
         }
-
-        // bottom side support strip
-        utl = (intvec3d_t){0,  -TBC, FH1}; utr = (intvec3d_t){w, -TBC, FH1};
-        ubl = (intvec3d_t){0, -BS, FH1}; ubr = (intvec3d_t){w, -BS, FH1};
-        ltl = (intvec3d_t){0,  -TBC, FH2}; ltr = (intvec3d_t){w, -TBC, FH2};
-        lbl = (intvec3d_t){0, -BS, FH2}; lbr = (intvec3d_t){w, -BS, FH2};
-        push_triangles(Yp, utl, utr, ltl, ltr); //top - facing hollow triangle
-        push_triangles(Xn, utl, ubl, ltl, lbl); //left
-        push_triangles(Xp, utr, ubr, ltr, lbr); //right
-        push_triangles(Yn, ubl, ubr, lbl, lbr); //bottom
-
-        utl.z = FH2; ubl.z = FH2; utr.z = FH2; ubr.z = FH2;
-        ltl.z = FH3; lbl.z = FH3; ltr.z = FH3; lbr.z = FH3;
-        push_triangles(Xn, utl, ubl, ltl, lbl); //left
-        push_triangles(Xp, utr, ubr, ltr, lbr); //right
-        push_triangles(Yn, ubl, ubr, lbl, lbr); //bottom
-
-        utl.z = FH3; ubl.z = FH3; utr.z = FH3; ubr.z = FH3;
-        ltl.z = FH4; lbl.z = FH4; ltr.z = FH4; lbr.z = FH4;
-        push_triangles(Xn, utl, ubl, ltl, lbl); //left
-        push_triangles(Xp, utr, ubr, ltr, lbr); //right
-        push_triangles(Yn, ubl, ubr, lbl, lbr); //bottom
-
-        utl.z = FH4; ubl.z = FH4; utr.z = FH4; ubr.z = FH4;
-        ltl.z = FH5; lbl.z = FH5; ltr.z = FH5; lbr.z = FH5;
-        push_triangles(Xn, utl, ubl, ltl, lbl); //left
-        push_triangles(Xp, utr, ubr, ltr, lbr); //right
-        push_triangles(Yn, ubl, ubr, lbl, lbr); //bottom
-        push_triangles(Zn, ltl, lbl, ltr, lbr); //lower face
     }
 
-    // PREPARE PYRAMID SUPPORTS + FOOT(?) + LOWER STRIP(?)
-
-        // DONE ABOVE: float body_size = (BS * raster_size.as_mm()) / UVstretchXY;
-        int32_t SW = w;
-        float set_width = (SW * raster_size.as_mm()) / UVstretchXY; // TODO: check stretch divide?
-
-        int32_t pyramid_count_Y = int(round(body_size/(foot.pyramid_pitch.as_mm()))); // TODO: StretchXY?
-        float final_pyramid_pitch_Y = body_size / pyramid_count_Y; // TODO: StretchXY?
-
-        int32_t pyramid_count_X = int(round(set_width/(foot.pyramid_pitch.as_mm()))); // TODO: StretchXY?
-        float final_pyramid_pitch_X = set_width / pyramid_count_X; // TODO: StretchXY?
-
-        int32_t PH = int(round(
-                        (final_pyramid_pitch_Y-foot.pyramid_top_length.as_mm())
-                         * 0.5 * foot.pyramid_height_factor * UVstretchZ / layer_height.as_mm()));
-
-        logger.INFO() << "pyramid_count_Y: " << pyramid_count_Y << std::endl;
-        logger.INFO() << "final_pyramid_pitch_Y: " << final_pyramid_pitch_Y << std::endl;
-
-        logger.INFO() << "pyramid_count_X: " << pyramid_count_X << std::endl;
-        logger.INFO() << "final_pyramid_pitch_X: " << final_pyramid_pitch_X << std::endl;
-
     if (foot.mode == pyramids) {
+
+        // PREPARE PYRAMID SUPPORTS + FOOT(?) + LOWER STRIP(?)
+            // DONE ABOVE: float body_size = (BS * raster_size.as_mm()) / UVstretchXY;
+            int32_t SW = w;
+            float set_width = (SW * raster_size.as_mm()) / UVstretchXY; // TODO: check stretch divide?
+
+            int32_t pyramid_count_Y = int(round(body_size/(foot.pyramid_pitch.as_mm()))); // TODO: StretchXY?
+            float final_pyramid_pitch_Y = body_size / pyramid_count_Y; // TODO: StretchXY?
+
+            int32_t pyramid_count_X = int(round(set_width/(foot.pyramid_pitch.as_mm()))); // TODO: StretchXY?
+            float final_pyramid_pitch_X = set_width / pyramid_count_X; // TODO: StretchXY?
+
+            int32_t PH = int(round(
+                            (final_pyramid_pitch_Y-foot.pyramid_top_length.as_mm())
+                            * 0.5 * foot.pyramid_height_factor * UVstretchZ / layer_height.as_mm()));
+
+            logger.INFO() << "pyramid_count_Y: " << pyramid_count_Y << std::endl;
+            logger.INFO() << "final_pyramid_pitch_Y: " << final_pyramid_pitch_Y << std::endl;
+
+            logger.INFO() << "pyramid_count_X: " << pyramid_count_X << std::endl;
+            logger.INFO() << "final_pyramid_pitch_X: " << final_pyramid_pitch_X << std::endl;
 
         std::vector<int32_t> pyramid_base_Y_points;
         std::vector<int32_t> pyramid_top_Y_points;

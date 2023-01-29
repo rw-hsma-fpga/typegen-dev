@@ -15,18 +15,4 @@ reduced foot Z:
   value: 4.0
   unit: mm
 
-reduced foot mode: pyramids
 
-pyramid pitch:
-  value: 1.0
-  unit: mm
-
-pyramid top length:
-  value: 0.2
-  unit: mm
-
-pyramid foot height:
-  value: 2.0
-  unit: mm
-
-pyramid height factor: 2.0

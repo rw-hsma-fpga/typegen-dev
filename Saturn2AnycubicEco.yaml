@@ -4,7 +4,7 @@ raster size:
   unit: mm
 
 layer height:
-  value: 0.050
+  value: 0.050 # 0.050
   unit: mm
 
 # Material: Anycubic Eco
@@ -12,4 +12,4 @@ layer height:
 
 # measured shrinkage against intended size - needed for fudge factors
 XYshrink_pct: -1.0 #-0.75
-Zshrink_pct: -0.42 #-2.00
+Zshrink_pct:  -0.5 #-2.00
