@@ -1381,7 +1381,7 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         const float side_support_width = 0.25; // mm
         const float half_support_width = 0.75; // mm
         const float min_support_intervalY = 4.0; // mm
-        const float hollow_triangle_width = 1.25; // mm
+        const float hollow_triangle_width = 1.00;//1.25; // mm
         // unstretched calculations
         int32_t support_intervalsY = int((body_size-2*side_support_width)/min_support_intervalY); // rounded down
         float support_interval = ((body_size-2*side_support_width)/support_intervalsY);
@@ -1400,9 +1400,10 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         int32_t HSW = round((half_support_width*UVstretchXY) / raster_size.as_mm());
         int32_t TSG = HTW-HSW;//round((triangle_support_gap*UVstretchXY) / raster_size.as_mm());
 
+
         // Z-direction dimensions
-        const float hollow_triangle_height = 1.25; // mm
-        const float solid_foot_height = 0.25; // mm
+        const float hollow_triangle_height = 1.00;//1.25; // mm
+        const float solid_foot_height = 0.20; // mm
         const float support_gap_height = 3.0; // mm
         const float support_base_height = 1.0; // mm
         // stretch + discretize
@@ -1417,11 +1418,13 @@ int TypeBitmap::generateMesh(reduced_foot foot, std::vector<nick> &nicks, float 
         int32_t FH4 = FH3-SGH;
         int32_t FH5 = FH4-SBH;
 
+
         // X-direction dimensions
         int32_t SW = bm_width;
-        const float x_support_gap = 1.0; // mm
-        const float min_support_intervalX = 5.0; // mm - includes gap (half on each side of gap)??
+        const float x_support_gap = 1.5; // mm
+        const float min_support_intervalX = 4.5; // mm - includes gap (half on each side of gap)??
         float set_width_size = (SW * raster_size.as_mm()) / UVstretchXY;
+
         int32_t support_intervalsX = int(set_width_size/min_support_intervalX); // rounded down
         if (support_intervalsX < 1)
             support_intervalsX = 1;

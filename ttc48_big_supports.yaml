@@ -19,7 +19,7 @@ space below refchar:
   unit: mm
 
 characters:
-  ASCII: AELMSTUWY
+  ASCII: AFLM
 #  unicode:
 #   - 0x2019
    # apostrophe used by the TTC
@@ -40,6 +40,6 @@ nicks:
     - type: flat
       z: 2.0
 
-
+reduced foot mode: supports
 
 # font scaling mode and parameters
