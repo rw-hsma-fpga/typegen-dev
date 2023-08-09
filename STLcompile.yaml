@@ -6,7 +6,7 @@ gap Y: 8
 
 
 working directory:
-  path: ./ttc48_pyramids/
+  path: ./ttc48_big_supports/
   create: false # ignored by STLcompiler for now
 
 
@@ -14,6 +14,13 @@ working directory:
 
 # rows
 structure:
-  - A E F H
-  - L M N S
-  - T U W Y
+
+  - O R T E N R T O I
+  - M leaf N O leaf S F M
+  - R I T O R G T O leaf
+  - G E N leaf S F E G I
+
+#structure:
+#  - A E F H
+#  - L M N S
+#  - T U W Y

@@ -2,7 +2,7 @@
 font file: fonts/TOSUBBL.ttf
 
 working directory:
-  path: ./ttc48_big_supports/
+  path: ./ttc48_pyramids/
   create: true
 
 body size:
@@ -19,9 +19,23 @@ space below refchar:
   unit: mm
 
 characters:
-  ASCII: GRETINSFOM
-  images:
-  - TIFF2
+  ASCII: T
+#  AE FH LM NS TU WY
+reduced foot mode: pyramids
+
+pyramid top length:
+  value: 0.25
+  unit: mm
+
+pyramid pitch:
+  value: 1.70
+  unit: mm
+
+pyramid foot height:
+  value: 3.0
+  unit: mm
+
+pyramid height factor: 2.0
 #  unicode:
 #   - 0x2019
    # apostrophe used by the TTC
@@ -42,6 +56,6 @@ nicks:
     - type: flat
       z: 2.0
 
-reduced foot mode: supports
+
 
 # font scaling mode and parameters
