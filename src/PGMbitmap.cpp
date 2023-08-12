@@ -454,6 +454,11 @@ int PGMbitmap::storePGM(std::string filename)
         return -1;
     }
 
+    if (filename.empty()) {
+        std::cerr << "ERROR: No filename given." << std::endl;
+        return -1;
+    }
+
     std::ofstream pgm(filename);
     if (!pgm.is_open()) {
         std::cerr << "ERROR: Opening " << filename <<" for writing failed." << std::endl;

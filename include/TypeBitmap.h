@@ -1,7 +1,7 @@
 #ifndef TYPEBITMAP_H
 #define TYPEBITMAP_H
 
-#include <cstdint>
+#include <cstdint> 
 #include <string>
 #include <vector>
 #include "t3t_support_types.h" 
@@ -18,6 +18,7 @@ struct reduced_foot {
     // parameters for pyramids mode
     dim_t pyramid_pitch; // X/Y pitch for pyramids to be approximated
     dim_t pyramid_top_length; // length of a side of cut-off pyramid
+    dim_t pyramid_top_column_height; // Height of square column on top of pyramid
     dim_t pyramid_foot_height; // Height of extra foot including pyramids
     float pyramid_height_factor; // pyramid height in relation to width/pitch
 

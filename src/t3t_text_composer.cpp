@@ -50,7 +50,7 @@ int main(int ac, char* av[])
 
     std::vector<std::vector<uint32_t>> text;
 
-    for(int i=0; i<3; i++) {
+    for(int i=0; i<opts.lines.size(); i++) {
         std::vector<uint32_t> vec;
         text.push_back(vec);
         for (int j=0; j<opts.lines[i].size(); j++) {
